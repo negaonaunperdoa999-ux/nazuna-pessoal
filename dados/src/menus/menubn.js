@@ -99,6 +99,7 @@ ${middleBorder}${menuItemIcon}${prefix}goza
 ${middleBorder}${menuItemIcon}${prefix}gozar
 ${middleBorder}${menuItemIcon}${prefix}mamar
 ${middleBorder}${menuItemIcon}${prefix}mamada
+${middleBorder}${menuItemIcon}${prefix}comer
 ${bottomBorder}
 `;
     }

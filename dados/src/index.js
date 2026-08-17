@@ -32187,9 +32187,10 @@ ${nivelSorte >= 70 ? '🎉 Hoje é seu dia de sorte!' : nivelSorte >= 40 ? '🤔
       case 'lambida':
       case 'explodir':
       case 'sexo':
+      case 'comer':
       case 'tomate':
         try {
-          const comandosImproprios = ['sexo', 'surubao', 'goza', 'gozar', 'mamar', 'mamada', 'beijob', 'beijarb', 'tapar'];
+          const comandosImproprios = ['sexo', 'comer', 'surubao', 'goza', 'gozar', 'mamar', 'mamada', 'beijob', 'beijarb', 'tapar'];
           if (isModoLite && comandosImproprios.includes(command)) return nazu.react('❌', {
             key: info.key
           });
@@ -32202,7 +32203,15 @@ ${nivelSorte >= 70 ? '🎉 Hoje é seu dia de sorte!' : nivelSorte >= 40 ? '🤔
           let GamezinData = fs.existsSync(__dirname + '/funcs/json/markgame.json') ? JSON.parse(fs.readFileSync(__dirname + '/funcs/json/markgame.json')) : {
             ranks: {}
           };
-          let responseText = GamezinData[command].replaceAll('#nome#', `@${getUserName(menc_os2)}`) || `Voce acabou de dar um(a) ${command} no(a) @${getUserName(menc_os2)}`;
+          const nomeMarcado = `@${getUserName(menc_os2)}`;
+          const comerTexts = [
+            `🍽️ ${nomeMarcado} foi devorado(a) no modo brincadeira!`,
+            `😏 ${nomeMarcado} acabou virando o prato principal da zoeira.`,
+            `🔥 ${nomeMarcado} foi comido(a) com muita ousadia!`
+          ];
+          let responseText = command === 'comer'
+            ? comerTexts[Math.floor(Math.random() * comerTexts.length)]
+            : GamezinData[command]?.replaceAll('#nome#', nomeMarcado) || `Voce acabou de dar um(a) ${command} no(a) ${nomeMarcado}`;
           let media = gamesData.games2[command];
           if (media?.image) {
             await nazu.sendMessage(from, {

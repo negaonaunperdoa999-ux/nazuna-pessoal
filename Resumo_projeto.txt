@@ -376,3 +376,32 @@ Bugs corrigidos:
 Verificacoes:
 - `index.js`, `menubn.js` e `menuadm.js` passaram no parse com `tree-sitter-javascript`.
 - Confirmado que `index.js`, `menubn.js`, `menuadm.js` e `Resumo_projeto.txt` ficaram sem BOM.
+
+Data: 2026-08-17
+Objetivo:
+- Corrigir a ausencia do comando `/comer` no modo brincadeira e manter o menu do `modobn` alinhado ao que o bot executa.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o comando `/comer` ao bloco de interacoes do `modobn` em `index.js`.
+- Criada uma resposta propria para `/comer` quando o comando for executado.
+- Exibido `/comer` na secao de interacoes picantes do `menubn`.
+
+Codigos escritos ou modificados:
+- Inclusao do `case 'comer'` no roteamento principal.
+- Ajuste do menu de brincadeiras para mostrar o novo comando.
+
+Bugs encontrados:
+- O `/comer` nao existia nem no handler principal nem no menu.
+
+Bugs corrigidos:
+- `/comer` agora responde no bot.
+- `/comer` agora aparece no `menubn`.
+
+Verificacoes:
+- Mantido o bloqueio de `modo lite` para comandos improprios.
+- O comando segue exigindo grupo, `modobn` ativo e usuario marcado.
