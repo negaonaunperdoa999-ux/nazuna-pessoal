@@ -316,3 +316,33 @@ Verificacoes:
 - Confirmado que o script de update continua criando backup antes do download.
 - Confirmado que as referencias GitHub agora apontam para `nazuna-pessoal`.
 - Ao final desta rodada, as alteracoes foram preparadas para commit e push no GitHub para manter o reservatorio sincronizado.
+
+Data: 2026-08-17
+Objetivo:
+- Corrigir a falha que impedia o carregamento completo de comandos sem derrubar o bot.
+
+Arquivos modificados:
+- dados/src/funcs/json/tools.json
+- dados/src/funcs/exports.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigidas as aspas internas nao escapadas em `tools.json`, que estavam quebrando o parse do JSON.
+- Adicionado alias `Logos2` nos exports para compatibilidade com o `index.js`.
+
+Codigos escritos ou modificados:
+- Reparo sistematico do arquivo `tools.json`.
+- Alias `modules.Logos2 = modules.logos` em `exports.js`.
+
+Bugs encontrados:
+- O bot iniciava, mas o carregamento dos exports recebia um JSON invalido e parte do pipeline de comandos ficava comprometida.
+- O `index.js` pedia o export `Logos2`, mas esse alias nao existia.
+
+Bugs corrigidos:
+- `tools.json` voltou a ser JSON valido.
+- O alias de logos passou a existir tambem como `Logos2`.
+
+Verificacoes:
+- Confirmado por parse de JSON que `tools.json` agora carrega corretamente.
+- Confirmado que a quantidade de linhas corrigidas foi grande o bastante para cobrir as aspas literais espalhadas pelo arquivo.
+- Esta rodada tambem sera enviada ao GitHub ao final, mantendo o reservatorio sempre atualizado.

@@ -110,6 +110,7 @@ async function loadModules() {
 
 
         modules.logos = logos.default ?? logos;
+        modules.Logos2 = modules.logos;
         modules.edits = edits.default ?? edits;
         modules.canvas = canvas.default ?? canvas;
         // Enhanced null checking and error handling for all modules
