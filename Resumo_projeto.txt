@@ -282,3 +282,37 @@ Bugs corrigidos:
 Verificacoes:
 - Confirmado com leitura UTF-8 que o texto limpo foi aplicado no trecho do `OWNER_ONLY_MESSAGE`.
 - Confirmado que os arquivos tocados foram regravados sem BOM.
+
+Data: 2026-08-17
+Objetivo:
+- Direcionar o comando `/atualizar` para o novo reservatório GitHub e deixar claro que a atualização preserva os dados existentes.
+
+Arquivos modificados:
+- dados/src/config.json
+- dados/src/.scripts/update.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Atualizada a URL oficial do repositório para `https://github.com/negaonaunperdoa999-ux/nazuna-pessoal`.
+- Ajustados os campos de identificacao do repositório para refletir o novo reservatório.
+- Tornado o script de update independente do nome antigo do repo, passando a derivar owner e repositório a partir da URL configurada.
+- Reescrito o aviso do `/atualizar` para deixar explícito que banco de dados, mídias e configurações locais são preservados.
+
+Codigos escritos ou modificados:
+- Ajuste da configuração GitHub em `config.json`.
+- Normalizacao da origem do clone e da busca do ultimo commit em `update.js`.
+- Refinamento da mensagem de aviso do comando `/atualizar` em `index.js`.
+
+Bugs encontrados:
+- A atualizacao ainda apontava para um repositório antigo e a mensagem do comando podia passar a impressao errada de perda de dados.
+
+Bugs corrigidos:
+- O `/atualizar` agora usa o reservatório atual como fonte de download.
+- O fluxo de update continua com backup automatico antes de aplicar as alteracoes.
+- O texto de aviso ficou alinhado com a preservacao dos dados existentes.
+
+Verificacoes:
+- Confirmado que o script de update continua criando backup antes do download.
+- Confirmado que as referencias GitHub agora apontam para `nazuna-pessoal`.
+- Ao final desta rodada, as alteracoes foram preparadas para commit e push no GitHub para manter o reservatorio sincronizado.

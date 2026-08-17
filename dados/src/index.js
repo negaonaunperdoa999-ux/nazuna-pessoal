@@ -16161,8 +16161,8 @@ ${prefix}addsubbot @152656307871952`
 ┃ 📢 *AVISOS IMPORTANTES:*
 ┣━━━━━━━━━━━━━━━━━━━━━
 ┃
-┃ ⚠️ Edições manuais no código 
-┃    serão *PERDIDAS*
+┃ ⚠️ O código será atualizado
+┃    a partir do GitHub
 ┃
 ┃ ✅ Banco de dados será 
 ┃    *PRESERVADO*
@@ -16171,6 +16171,10 @@ ${prefix}addsubbot @152656307871952`
 ┃    serão *MANTIDAS*
 ┃
 ┃ ✅ Mídias serão *PRESERVADAS*
+┃
+┃ ✅ Configurações locais e
+┃    dados existentes ficam
+┃    preservados no processo
 ┃
 ┃ 🔒 Backup automático será criado
 ┃
