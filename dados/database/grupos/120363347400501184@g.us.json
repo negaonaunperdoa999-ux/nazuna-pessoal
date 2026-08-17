@@ -1,0 +1,54 @@
+{
+  "mark": {},
+  "createdAt": "2026-08-13T15:23:43.493Z",
+  "groupName": "Primatas",
+  "modorpg": false,
+  "minMessage": null,
+  "moderators": [],
+  "allowedModCommands": [],
+  "mutedUsers": {},
+  "mutedUsers2": {},
+  "levelingEnabled": false,
+  "adminWhitelist": {},
+  "roles": {},
+  "roleMessages": {},
+  "contador": [
+    {
+      "id": "275410801684550@lid",
+      "msg": 5,
+      "cmd": 2,
+      "figu": 0,
+      "pushname": "Marcoslemos",
+      "firstSeen": "2026-08-13T15:23:43.495Z",
+      "lastActivity": "2026-08-13T15:26:19.132Z"
+    },
+    {
+      "id": "180410604642387@lid",
+      "msg": 8,
+      "cmd": 7,
+      "figu": 0,
+      "pushname": "cadu",
+      "firstSeen": "2026-08-13T15:23:48.280Z",
+      "lastActivity": "2026-08-13T17:19:48.569Z"
+    },
+    {
+      "id": "76837401174259@lid",
+      "msg": 4,
+      "cmd": 0,
+      "figu": 2,
+      "pushname": "Ryan",
+      "firstSeen": "2026-08-13T16:41:46.505Z",
+      "lastActivity": "2026-08-13T16:49:31.984Z"
+    },
+    {
+      "id": "95601995845652@lid",
+      "msg": 8,
+      "cmd": 0,
+      "figu": 9,
+      "pushname": "Muka",
+      "firstSeen": "2026-08-13T16:47:19.418Z",
+      "lastActivity": "2026-08-13T16:48:58.613Z"
+    }
+  ],
+  "modobrincadeira": true
+}

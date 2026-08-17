@@ -1,0 +1,71 @@
+{
+  "mark": {},
+  "createdAt": "2026-08-13T15:26:59.796Z",
+  "groupName": "⚔️Mateus Santos⚔️",
+  "modorpg": false,
+  "minMessage": null,
+  "moderators": [],
+  "allowedModCommands": [],
+  "mutedUsers": {},
+  "mutedUsers2": {},
+  "levelingEnabled": false,
+  "adminWhitelist": {},
+  "roles": {},
+  "roleMessages": {},
+  "contador": [
+    {
+      "id": "55598989181174@lid",
+      "msg": 1,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Winchester",
+      "firstSeen": "2026-08-13T15:26:59.797Z",
+      "lastActivity": "2026-08-13T15:26:59.797Z"
+    },
+    {
+      "id": "61513175953475@lid",
+      "msg": 1,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Pedro Tavares",
+      "firstSeen": "2026-08-13T15:27:10.684Z",
+      "lastActivity": "2026-08-13T15:27:10.684Z"
+    },
+    {
+      "id": "77223931465845@lid",
+      "msg": 5,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "𝖘𝖎𝖑𝖛𝖆",
+      "firstSeen": "2026-08-13T15:28:57.302Z",
+      "lastActivity": "2026-08-13T15:34:56.288Z"
+    },
+    {
+      "id": "24189742358620@lid",
+      "msg": 11,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "~♟️",
+      "firstSeen": "2026-08-13T15:32:42.721Z",
+      "lastActivity": "2026-08-13T15:33:53.081Z"
+    },
+    {
+      "id": "177030163333162@lid",
+      "msg": 3,
+      "cmd": 0,
+      "figu": 2,
+      "pushname": "Matheus Roque",
+      "firstSeen": "2026-08-13T15:33:11.907Z",
+      "lastActivity": "2026-08-13T15:34:06.023Z"
+    },
+    {
+      "id": "68823126401259@lid",
+      "msg": 1,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Armando Miguel",
+      "firstSeen": "2026-08-13T15:34:21.213Z",
+      "lastActivity": "2026-08-13T15:34:21.213Z"
+    }
+  ]
+}

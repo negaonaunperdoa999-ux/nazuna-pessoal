@@ -1,0 +1,284 @@
+Resumo do projeto
+=================
+
+Este arquivo registra automaticamente, ao final de cada tarefa realizada neste projeto, as alteracoes feitas, os codigos escritos ou modificados, e os bugs encontrados ou corrigidos.
+
+Regra de uso
+------------
+- Sempre que uma alteracao for concluida, adicionar uma nova entrada neste arquivo.
+- Cada entrada deve informar a data, o objetivo, os arquivos alterados, o que foi implementado, os bugs encontrados/corrigidos e qualquer verificacao feita.
+- Caso nenhuma mudanca de codigo seja feita em uma tarefa, registrar mesmo assim quando houver investigacao relevante, decisao tecnica ou bug identificado.
+
+Entradas
+--------
+
+Data: 2026-08-13
+Objetivo:
+- Criar o arquivo de acompanhamento do projeto solicitado pelo usuario.
+
+Arquivos criados:
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado um diario tecnico para registrar todas as alteracoes futuras feitas no projeto.
+- Definida a estrutura de registro com objetivo, arquivos alterados, implementacao, bugs e verificacoes.
+
+Codigos escritos ou modificados:
+- Nenhum codigo de aplicacao foi alterado nesta entrada.
+
+Bugs encontrados:
+- Nenhum bug encontrado nesta etapa.
+
+Bugs corrigidos:
+- Nenhum bug corrigido nesta etapa.
+
+Verificacoes:
+- Confirmado que o arquivo nao existia antes na raiz do projeto.
+
+Data: 2026-08-13
+Objetivo:
+- Renomear o comando /modoadv para /advlink sem alterar sua funcao.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuadm.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- O gatilho do comando foi alterado de case 'modoadv' para case 'advlink'.
+- O menu de administracao passou a exibir o comando advlink na secao de modos e ativacoes.
+- A logica interna e o campo salvo modoADV foram mantidos para preservar as configuracoes existentes dos grupos.
+
+Codigos escritos ou modificados:
+- Substituido o identificador publico do comando no switch principal.
+- Adicionada a linha ${prefix}advlink no menu administrativo.
+
+Bugs encontrados:
+- O comando antigo /modoadv ainda era o gatilho publico ativo.
+- O menu administrativo nao exibia o novo nome /advlink.
+
+Bugs corrigidos:
+- /modoadv deixou de ser reconhecido como comando.
+- /advlink passou a acionar a mesma funcao de modo advertencia.
+
+Verificacoes:
+- Confirmado com busca textual que modoadv nao aparece mais em dados/src, README.md, package.json ou startup.js.
+- Confirmado que advlink aparece no switch principal e no menu administrativo.
+- Tentativa de checagem com node --check falhou porque o Windows retornou "Acesso negado" ao executar node.exe.
+
+Data: 2026-08-13
+Objetivo:
+- Trazer do projeto Midnight os comandos /plaq1 ate /plaq7 com a mesma funcao de gerar plaquinhas por imagem remota, e deixar esses comandos acessiveis apenas para dono/VIP quando o modo18 estiver ativo.
+
+Arquivos criados:
+- dados/src/funcs/private/hutaoPlaques.js
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuvip.js
+- dados/src/menus/menuadm.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Lido o RESUMO_PROJETO.txt do projeto D:/Midnight para entender o contexto dos comandos VIP e modo18.
+- Copiada a logica dos comandos /plaq1, /plaq2, /plaq3, /plaq4, /plaq5, /plaq6 e /plaq7 para um novo modulo local.
+- Adicionados os cases /plaq1 ate /plaq7 no switch principal do bot.
+- Cada comando de plaquinha valida dono ou VIP antes de responder.
+- Cada comando de plaquinha exige grupo e exige que modo18/nsfw/mode18 esteja ativo no groupData.
+- Adicionado o comando /modo18 com aliases /nsfw e /mode18 para administradores ou dono ativarem/desativarem o modo +18 do grupo.
+- O /modo18 salva as flags modo18, nsfw e mode18 para manter compatibilidade.
+- O comando /menuvip agora exige dono ou VIP antes de exibir o menu.
+- O menu VIP foi substituido por uma lista direta dos comandos /plaq1 ate /plaq7.
+- O menu administrativo passou a listar /modo18 junto dos comandos de modo/ativacoes.
+
+Codigos escritos ou modificados:
+- Criado o modulo hutaoPlaques.js com PLAQ_COMMANDS, definicoes de limite/caption/url e funcoes getPlaqDefinition, buildPlaqUrl e fetchPlaqImageBuffer.
+- Importadas as funcoes de plaquinha no index.js.
+- Implementado o bloco de roteamento dos comandos /plaq1 ate /plaq7.
+- Implementado o bloco de roteamento do /modo18.
+- Reescrito o menuvip.js para renderizar somente os comandos VIP de plaquinha.
+
+Bugs encontrados:
+- Este projeto nao tinha o modulo hutaoPlaques.js nem os comandos /plaq1 ate /plaq7.
+- Este projeto nao tinha controle modo18/nsfw/mode18, necessario para liberar os comandos +18 com seguranca.
+- O /menuvip antigo dependia do cadastro dinamico de comandos VIP e poderia aparecer vazio para estes comandos transplantados.
+- node.exe do ambiente continua retornando "Acesso negado" quando chamado pelo PowerShell, impedindo node --check direto.
+
+Bugs corrigidos:
+- /plaq1 ate /plaq7 agora existem no bot e usam a mesma base de URLs do Midnight.
+- /menuvip agora mostra diretamente os comandos VIP de plaquinha.
+- /modo18 agora existe para ativar/desativar o modo +18 nos grupos.
+- Os comandos de plaquinha ficam bloqueados para nao VIPs, para PV e para grupos sem modo18 ativo.
+
+Verificacoes:
+- Confirmado com busca textual que /plaq1 ate /plaq7 aparecem no novo modulo, no menu VIP e no switch principal.
+- Confirmado com busca textual que /modo18 aparece no switch principal e no menu administrativo.
+- Confirmado que /menuvip possui bloqueio para usuarios que nao sao dono/VIP.
+- Importados hutaoPlaques.js e menuvip.js no runtime interno do Codex; ambos carregaram corretamente.
+- Validado no runtime interno que PLAQ_COMMANDS contem plaq1 ate plaq7, buildPlaqUrl insere o texto e o menu inclui /plaq1 e /modo18.
+- Tentativa de node --check via PowerShell falhou porque o Windows retornou "Acesso negado" ao executar node.exe.
+
+Data: 2026-08-13
+Objetivo:
+- Investigar relato de que o bot havia parado de responder comandos, mesmo sem erro no painel.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuvip.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Revisados os trechos alterados anteriormente para procurar returns globais ou bloqueios antes do switch de comandos.
+- Confirmado que o sistema VIP dinamico nao estava bloqueando todos os comandos, pois vipCommands.json estava com a lista commands vazia.
+- Removido o bloqueio novo do /menuvip para evitar qualquer efeito colateral de permissao no menu.
+- Reescrito o menuvip.js com texto ASCII puro para reduzir risco de problema de encoding em hospedagem/painel.
+
+Codigos escritos ou modificados:
+- Removido do case /menuvip o retorno que exigia isPremium ou isOwner.
+- Substituido o layout do menuvip.js por uma versao ASCII simples listando plaq1 ate plaq7.
+
+Bugs encontrados:
+- O bot ficou temporariamente sem responder comandos, mas voltou a responder sem uma causa confirmada no painel.
+- node.exe continua inacessivel pelo PowerShell com "Acesso negado", impedindo checagem direta com node --check.
+
+Bugs corrigidos:
+- Possivel risco de bloqueio indesejado no /menuvip foi removido.
+- Possivel risco de encoding no menuvip.js foi reduzido usando ASCII puro.
+
+Verificacoes:
+- Revisados os blocos de /menuvip, /modo18 e /plaq1 ate /plaq7.
+- Confirmado que vipCommands.json nao tinha comandos VIP dinamicos ativos que pudessem bloquear tudo.
+
+Data: 2026-08-14
+Objetivo:
+- Migrar a base do modulo RPG para o estilo do HutaoBot-MD-main, ajustando menu, mensagens e bloqueios do Modo RPG.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menurpg.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Localizada a origem do modulo RPG no projeto HutaoBot-MD-main.
+- Substituido o menu RPG por uma versao mais alinhada ao HutaoBot, com seccoes de perfil, economia, atividades, combate, crafting, social e admin.
+- Centralizada a mensagem de bloqueio do Modo RPG em uma funcao unica para padronizar os retornos.
+- Ajustada a resposta do comando de ativacao/desativacao do Modo RPG para um texto mais proximo do estilo do HutaoBot.
+- Mantidos os comandos que o bot atual ja possui, para evitar que o menu mostre atalhos inexistentes.
+
+Codigos escritos ou modificados:
+- Reescrito o arquivo dados/src/menus/menurpg.js.
+- Adicionada a funcao rpgDisabledMessage(prefix) em dados/src/index.js.
+- Atualizado o case modorpg/rpgmode em dados/src/index.js.
+- Substituidas as mensagens repetidas de bloqueio do RPG para usar a funcao central.
+
+Bugs encontrados:
+- O bot principal nao tem uma copia local do modulo RPG do Midnight/HutaoBot na mesma arquitetura, entao a migracao precisou ser adaptada ao codigo atual.
+- Durante a troca em massa, parte do texto ficou com encoding quebrado e precisou de correcao manual.
+
+Bugs corrigidos:
+- A mensagem central de bloqueio do RPG foi corrigida para ASCII limpo.
+- As verificacoes de modo RPG voltaram a usar uma unica mensagem padronizada.
+
+Verificacoes:
+- Confirmado com busca textual que os bloqueios de RPG agora chamam rpgDisabledMessage(prefix).
+- Confirmado que o menu RPG novo foi gravado em dados/src/menus/menurpg.js.
+- Nao foi possivel validar com node --check, porque o ambiente nao possui o comando node reconhecido no PowerShell.
+
+Data: 2026-08-14
+Objetivo:
+- Ajustar o modo brincadeira (modobn) para ficar compatível com o estilo do HutaoBot-MD-main e evitar conflitos com futuros comandos.
+
+Arquivos modificados:
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigido o crash de inicializacao causado por identificador corrompido em um bloco de comandos do modo brincadeira.
+- Fechada a estrutura quebrada deixada apos a remocao do bloco de cozinha/RPG.
+- Atualizado o comando modobn para aceitar aliases equivalentes ao HutaoBot: modogamer e modo-gamer.
+- Espelhada a flag interna do modo brincadeira entre modobrincadeira e modog para manter compatibilidade.
+- Ajustadas as respostas de ativar/desativar o modo para o texto no estilo do HutaoBot.
+- Mantido o menu de brincadeiras como ponto de entrada do bloco, com novos aliases de menu.
+
+Codigos escritos ou modificados:
+- Ajuste do toggle do modo brincadeira em dados/src/index.js.
+- Inclusao de aliases adicionais para o menu em dados/src/index.js.
+- Atualizacao do resumo do projeto com esta rodada.
+
+Bugs encontrados:
+- O arquivo principal ainda contem varios trechos com encoding quebrado em strings, mas nem todos sao erros fatais.
+- A remocao do bloco de cozinha deixou um if do crime sem fechamento e isso quebrou o parse do arquivo.
+
+Bugs corrigidos:
+- Identificador corrompido normalizado para ASCII limpo.
+- Chave faltante do bloco crime restaurada.
+- Flags do modo brincadeira alinhadas entre os nomes antigo e novo.
+
+Verificacoes:
+- Confirmado que o bot usa agora os aliases modobn, modogamer e modo-gamer.
+- Confirmado que isModoBn aceita tanto groupData.modobrincadeira quanto groupData.modog.
+- Nao foi possivel executar node --check neste ambiente por ausencia do comando node.
+
+Data: 2026-08-17
+Objetivo:
+- Finalizar a sincronizacao dos comandos de brincadeira com o HutaoBot-MD-main do pendrive.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- dados/src/funcs/json/gamestext.json
+- dados/src/funcs/json/gamestext2.json
+- dados/src/funcs/utils/relationships.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Sincronizado o menu de brincadeiras com a versao do HutaoBot-MD-main.
+- Sincronizadas as tabelas de mensagens de `gamestext.json` e `gamestext2.json` com a versao do pendrive.
+- Sincronizada a logica de relacionamentos e pedidos do modo brincadeira com a base do HutaoBot-MD-main.
+- Ajustada a mensagem do `modobn` para o texto original do HutaoBot-MD-main.
+
+Codigos escritos ou modificados:
+- Atualizacao do bloco `modobn` em `dados/src/index.js`.
+- Substituicao dos arquivos de brincadeira pelos equivalentes do HutaoBot-MD-main.
+
+Bugs encontrados:
+- O PowerShell do ambiente nao manteve a sincronizacao por copia textual simples, por causa de encoding e leitura de arquivo.
+
+Bugs corrigidos:
+- A sincronizacao passou a ser feita por leitura binaria direta do ZIP, garantindo os mesmos bytes do pendrive.
+
+Verificacoes:
+- Confirmado por hash SHA-256 binario que `menubn.js`, `gamestext.json`, `gamestext2.json` e `relationships.js` ficaram identicos aos do HutaoBot-MD-main.
+- Confirmado com busca textual que a mensagem de ativacao/desativacao do `modobn` foi atualizada.
+
+Data: 2026-08-17
+Objetivo:
+- Normalizar textos do codigo para UTF-8 puro sem BOM e reduzir a corrompido de acentos e emojis.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/funcs/utils/gerarnick.js
+- dados/src/funcs/json/tools.json
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigidos os caracteres corrompidos que ainda apareciam no `index.js`, com foco em acentos, emojis e mensagens do bot.
+- Mantido o texto do `OWNER_ONLY_MESSAGE` em formato limpo e legivel.
+- Gravados os arquivos como UTF-8 puro sem BOM para evitar nova corrupcao na leitura.
+
+Codigos escritos ou modificados:
+- Ajuste de textos quebrados no `index.js`.
+- Limpeza de encoding em `gerarnick.js` e `tools.json`.
+- Correcao do titulo do menu de brincadeiras em `menubn.js`.
+
+Bugs encontrados:
+- Parte do texto do projeto ainda estava com encoding misturado, o que mantinha mensagens e comentarios corrompidos.
+
+Bugs corrigidos:
+- A camada principal de texto corrompido foi normalizada para UTF-8 sem BOM.
+- O `OWNER_ONLY_MESSAGE` ficou com o texto limpo e legivel.
+
+Verificacoes:
+- Confirmado com leitura UTF-8 que o texto limpo foi aplicado no trecho do `OWNER_ONLY_MESSAGE`.
+- Confirmado que os arquivos tocados foram regravados sem BOM.

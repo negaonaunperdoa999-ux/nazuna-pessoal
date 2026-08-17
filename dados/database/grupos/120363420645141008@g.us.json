@@ -1,0 +1,44 @@
+{
+  "mark": {},
+  "createdAt": "2026-08-13T15:38:25.108Z",
+  "groupName": "☕︎ Devsland 💻",
+  "modorpg": false,
+  "minMessage": null,
+  "moderators": [],
+  "allowedModCommands": [],
+  "mutedUsers": {},
+  "mutedUsers2": {},
+  "levelingEnabled": false,
+  "adminWhitelist": {},
+  "roles": {},
+  "roleMessages": {},
+  "contador": [
+    {
+      "id": "118923466952897@lid",
+      "msg": 23,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Brunera vendas",
+      "firstSeen": "2026-08-13T15:38:25.110Z",
+      "lastActivity": "2026-08-13T17:28:44.335Z"
+    },
+    {
+      "id": "262371046097068@lid",
+      "msg": 5,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Douglas Bk",
+      "firstSeen": "2026-08-13T15:50:25.609Z",
+      "lastActivity": "2026-08-13T15:53:16.301Z"
+    },
+    {
+      "id": "275410801684550@lid",
+      "msg": 7,
+      "cmd": 0,
+      "figu": 0,
+      "pushname": "Marcoslemos",
+      "firstSeen": "2026-08-13T17:27:31.166Z",
+      "lastActivity": "2026-08-13T17:29:03.625Z"
+    }
+  ]
+}
