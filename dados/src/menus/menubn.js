@@ -90,6 +90,7 @@ ${bottomBorder}
 ${menuTopBorder}${separatorIcon} *${hotInteractionsMenuTitle}*
 ${middleBorder}
 ${middleBorder}${menuItemIcon}${prefix}surubao
+${middleBorder}${menuItemIcon}${prefix}suruba
 ${middleBorder}${menuItemIcon}${prefix}sexo
 ${middleBorder}${menuItemIcon}${prefix}beijob
 ${middleBorder}${menuItemIcon}${prefix}beijarb
@@ -114,6 +115,7 @@ ${middleBorder}${menuItemIcon}${prefix}gostoso
 ${middleBorder}${menuItemIcon}${prefix}feio
 ${middleBorder}${menuItemIcon}${prefix}rico
 ${middleBorder}${menuItemIcon}${prefix}pobre${isLiteMode ? '' : `\n${middleBorder}${menuItemIcon}${prefix}pirocudo${isLiteMode ? '' : `\n${middleBorder}${menuItemIcon}${prefix}nazista`}${isLiteMode ? '' : `\n${middleBorder}${menuItemIcon}${prefix}ladrao`}`}
+${isLiteMode ? '' : `${middleBorder}${menuItemIcon}${prefix}pirokudo`}
 ${middleBorder}${menuItemIcon}${prefix}safado
 ${middleBorder}${menuItemIcon}${prefix}vesgo
 
@@ -214,6 +216,41 @@ ${middleBorder}${menuItemIcon}${prefix}billionario
 ${middleBorder}${menuItemIcon}${prefix}poderoso
 ${middleBorder}${menuItemIcon}${prefix}vencedor
 ${middleBorder}${menuItemIcon}${prefix}senhor
+${middleBorder}${menuItemIcon}${prefix}analogico
+${middleBorder}${menuItemIcon}${prefix}antisocial
+${middleBorder}${menuItemIcon}${prefix}ateu
+${middleBorder}${menuItemIcon}${prefix}atleta
+${middleBorder}${menuItemIcon}${prefix}aventureiro
+${middleBorder}${menuItemIcon}${prefix}bagunceiro
+${middleBorder}${menuItemIcon}${prefix}bombado
+${middleBorder}${menuItemIcon}${prefix}calmo
+${middleBorder}${menuItemIcon}${prefix}caseiro
+${middleBorder}${menuItemIcon}${prefix}cetico
+${middleBorder}${menuItemIcon}${prefix}chefe
+${middleBorder}${menuItemIcon}${prefix}comilao
+${middleBorder}${menuItemIcon}${prefix}conservador
+${middleBorder}${menuItemIcon}${prefix}criativo
+${middleBorder}${menuItemIcon}${prefix}dependente
+${middleBorder}${menuItemIcon}${prefix}dorminhoco
+${middleBorder}${menuItemIcon}${prefix}economico
+${middleBorder}${menuItemIcon}${prefix}estudioso
+${middleBorder}${menuItemIcon}${prefix}extrovertido
+${middleBorder}${menuItemIcon}${prefix}fofoqueiro
+${middleBorder}${menuItemIcon}${prefix}gastador
+${middleBorder}${menuItemIcon}${prefix}organizado
+${middleBorder}${menuItemIcon}${prefix}patrao
+${middleBorder}${menuItemIcon}${prefix}playboy
+${middleBorder}${menuItemIcon}${prefix}popular
+${middleBorder}${menuItemIcon}${prefix}presidente
+${middleBorder}${menuItemIcon}${prefix}rei
+${middleBorder}${menuItemIcon}${prefix}sedentario
+${middleBorder}${menuItemIcon}${prefix}sortudo2
+${bottomBorder}
+
+${menuTopBorder}${separatorIcon} *📊 DADOS DO GRUPO*
+${middleBorder}
+${middleBorder}${menuItemIcon}${prefix}statusgp
+${middleBorder}${menuItemIcon}${prefix}dadosgp
 ${bottomBorder}
 
 ${menuTopBorder}${separatorIcon} *${femaleFunMenuTitle}*
@@ -340,6 +377,13 @@ ${middleBorder}${menuItemIcon}${prefix}bilionaria
 ${middleBorder}${menuItemIcon}${prefix}poderosa
 ${middleBorder}${menuItemIcon}${prefix}vencedora
 ${middleBorder}${menuItemIcon}${prefix}senhora
+${middleBorder}${menuItemIcon}${prefix}organizada
+${middleBorder}${menuItemIcon}${prefix}analogica
+${middleBorder}${menuItemIcon}${prefix}atleta
+${middleBorder}${menuItemIcon}${prefix}bombada
+${middleBorder}${menuItemIcon}${prefix}comilona
+${middleBorder}${menuItemIcon}${prefix}patroa
+${middleBorder}${menuItemIcon}${prefix}presidenta
 ${bottomBorder}
 
 ${menuTopBorder}${separatorIcon} *${maleRanksMenuTitle}*
@@ -368,6 +412,30 @@ ${middleBorder}${menuItemIcon}${prefix}rankcharmoso
 ${middleBorder}${menuItemIcon}${prefix}rankvisionario
 ${middleBorder}${menuItemIcon}${prefix}rankpoderoso
 ${middleBorder}${menuItemIcon}${prefix}rankvencedor
+${middleBorder}${menuItemIcon}${prefix}rankgays
+${middleBorder}${menuItemIcon}${prefix}rankburros
+${middleBorder}${menuItemIcon}${prefix}rankinteligentes
+${middleBorder}${menuItemIcon}${prefix}rankotakus
+${middleBorder}${menuItemIcon}${prefix}rankfiels
+${middleBorder}${menuItemIcon}${prefix}rankinfieis
+${middleBorder}${menuItemIcon}${prefix}rankcornos
+${middleBorder}${menuItemIcon}${prefix}rankgados
+${middleBorder}${menuItemIcon}${prefix}rankgostosos
+${middleBorder}${menuItemIcon}${prefix}rankricos
+${middleBorder}${menuItemIcon}${prefix}rankpobres
+${middleBorder}${menuItemIcon}${prefix}rankfortes
+${middleBorder}${menuItemIcon}${prefix}rankpegadores
+${middleBorder}${menuItemIcon}${prefix}rankmachos
+${middleBorder}${menuItemIcon}${prefix}ranknerds
+${middleBorder}${menuItemIcon}${prefix}ranktrabalhadores
+${middleBorder}${menuItemIcon}${prefix}rankbrabos
+${middleBorder}${menuItemIcon}${prefix}ranklindos
+${middleBorder}${menuItemIcon}${prefix}rankmalandros
+${middleBorder}${menuItemIcon}${prefix}rankengracados
+${middleBorder}${menuItemIcon}${prefix}rankcharmosos
+${middleBorder}${menuItemIcon}${prefix}rankvisionarios
+${middleBorder}${menuItemIcon}${prefix}rankpoderosos
+${middleBorder}${menuItemIcon}${prefix}rankvencedores
 ${bottomBorder}
 
 ${menuTopBorder}${separatorIcon} *${femaleRanksMenuTitle}*
@@ -395,6 +463,22 @@ ${middleBorder}${menuItemIcon}${prefix}rankcharmosa
 ${middleBorder}${menuItemIcon}${prefix}rankvisionaria
 ${middleBorder}${menuItemIcon}${prefix}rankpoderosa
 ${middleBorder}${menuItemIcon}${prefix}rankvencedora
+${middleBorder}${menuItemIcon}${prefix}ranklesbicas
+${middleBorder}${menuItemIcon}${prefix}rankburras
+${middleBorder}${menuItemIcon}${prefix}rankcornas
+${middleBorder}${menuItemIcon}${prefix}rankgads
+${middleBorder}${menuItemIcon}${prefix}rankgostosas
+${middleBorder}${menuItemIcon}${prefix}rankricas
+${middleBorder}${menuItemIcon}${prefix}rankpegadoras
+${middleBorder}${menuItemIcon}${prefix}ranktrabalhadoras
+${middleBorder}${menuItemIcon}${prefix}rankbrabas
+${middleBorder}${menuItemIcon}${prefix}ranklindas
+${middleBorder}${menuItemIcon}${prefix}rankmalandras
+${middleBorder}${menuItemIcon}${prefix}rankengracadas
+${middleBorder}${menuItemIcon}${prefix}rankcharmosas
+${middleBorder}${menuItemIcon}${prefix}rankvisionarias
+${middleBorder}${menuItemIcon}${prefix}rankpoderosas
+${middleBorder}${menuItemIcon}${prefix}rankvencedoras
 ${bottomBorder}
 `;
     return menuContent;

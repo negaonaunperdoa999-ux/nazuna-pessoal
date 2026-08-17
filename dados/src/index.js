@@ -31817,7 +31817,6 @@ ${nivelSorte >= 70 ? '🎉 Hoje é seu dia de sorte!' : nivelSorte >= 40 ? '🤔
       case 'serio':
       case 'sortudo2':
       case 'zueira':
-      case 'viaja nte':
       case 'responsavel':
       case 'irresponsavel':
         try {

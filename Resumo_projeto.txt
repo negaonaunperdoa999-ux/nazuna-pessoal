@@ -346,3 +346,33 @@ Verificacoes:
 - Confirmado por parse de JSON que `tools.json` agora carrega corretamente.
 - Confirmado que a quantidade de linhas corrigidas foi grande o bastante para cobrir as aspas literais espalhadas pelo arquivo.
 - Esta rodada tambem sera enviada ao GitHub ao final, mantendo o reservatorio sempre atualizado.
+
+Data: 2026-08-17
+Objetivo:
+- Integrar melhor o modo brincadeira (`modobn`) ao menu atual do Nazuna, mantendo a estrutura em `dados/src/`.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Removido o alias quebrado `viaja nte` do bloco do `modobn` em `index.js`.
+- Atualizado o `menubn.js` para exibir comandos que ainda nao apareciam no menu, incluindo `suruba`, `pirokudo`, `organizada` e aliases adicionais de ranking.
+- Mantida a organizacao atual do menu, sem quebrar os carregadores ESM existentes.
+
+Codigos escritos ou modificados:
+- Ajuste do case do `modobn` em `dados/src/index.js`.
+- Expansao das secoes de brincadeiras, rankings masculino/feminino e interacoes picantes em `dados/src/menus/menubn.js`.
+
+Bugs encontrados:
+- O menu de brincadeiras nao mostrava todos os comandos expostos pelo modo brincadeira.
+- Existia um alias corrompido (`viaja nte`) no bloco do modo brincadeira.
+
+Bugs corrigidos:
+- Os comandos de brincadeira agora aparecem de forma mais completa no `menubn`.
+- O alias corrompido foi removido do `index.js`.
+
+Verificacoes:
+- `index.js`, `menubn.js` e `menuadm.js` passaram no parse com `tree-sitter-javascript`.
+- Confirmado que `index.js`, `menubn.js`, `menuadm.js` e `Resumo_projeto.txt` ficaram sem BOM.
