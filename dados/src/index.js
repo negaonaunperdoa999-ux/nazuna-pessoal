@@ -32204,14 +32204,19 @@ ${nivelSorte >= 70 ? '🎉 Hoje é seu dia de sorte!' : nivelSorte >= 40 ? '🤔
             ranks: {}
           };
           const nomeMarcado = `@${getUserName(menc_os2)}`;
-          const comerTexts = [
-            `🍽️ ${nomeMarcado} foi devorado(a) no modo brincadeira!`,
-            `😏 ${nomeMarcado} acabou virando o prato principal da zoeira.`,
-            `🔥 ${nomeMarcado} foi comido(a) com muita ousadia!`
-          ];
-          let responseText = command === 'comer'
-            ? comerTexts[Math.floor(Math.random() * comerTexts.length)]
-            : GamezinData[command]?.replaceAll('#nome#', nomeMarcado) || `Voce acabou de dar um(a) ${command} no(a) ${nomeMarcado}`;
+          if (command === 'comer') {
+            const comerCaption = `Você acaba de comer gostosinho a(o) ⩽ ${nomeMarcado}... 🥵🔞`;
+            await nazu.sendMessage(from, {
+              video: {
+                url: 'https://telegra.ph/file/100bd693799b79f870592.mp4'
+              },
+              caption: comerCaption,
+              mentions: [menc_os2],
+              gifPlayback: true
+            });
+            break;
+          }
+          let responseText = GamezinData[command]?.replaceAll('#nome#', nomeMarcado) || `Voce acabou de dar um(a) ${command} no(a) ${nomeMarcado}`;
           let media = gamesData.games2[command];
           if (media?.image) {
             await nazu.sendMessage(from, {

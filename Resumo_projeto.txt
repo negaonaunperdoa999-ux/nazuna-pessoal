@@ -405,3 +405,6 @@ Bugs corrigidos:
 Verificacoes:
 - Mantido o bloqueio de `modo lite` para comandos improprios.
 - O comando segue exigindo grupo, `modobn` ativo e usuario marcado.
+
+Atualizacao nova:
+- O `/comer` foi alinhado ao comportamento original do Hutao, com a mesma mensagem e a midia em GIF/video reproduzido com `gifPlayback`.
