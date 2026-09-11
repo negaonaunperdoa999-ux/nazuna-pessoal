@@ -160,6 +160,7 @@ import * as ia from './funcs/private/ia.js';
 import * as vipCommandsManager from './utils/vipCommandsManager.js';
 import { PLAQ_COMMANDS, fetchPlaqImageBuffer, getPlaqDefinition } from './funcs/private/hutaoPlaques.js';
 import { sendRichHtmlTest } from './funcs/private/pokemonRichHtml.js';
+import { sendGbaTest } from './funcs/private/gba/gbaTestHtml.js';
 import { getInfo as gdriveGetInfo } from './funcs/utils/gdrive.js';
 import { getInfo as mediafireGetInfo } from './funcs/utils/mediafire.js';
 import { getInfo as twitterGetInfo } from './funcs/utils/twitter.js';
@@ -5788,6 +5789,16 @@ Entre em contato com o dono do bot:
         } catch (e) {
           console.error('[richtest] Erro final ao processar comando:', e);
           await reply('Falha ao enviar Rich HTML. Veja o console do bot para o ponto exato do erro.');
+        }
+        break;
+      }
+
+      case 'gbatest': {
+        try {
+          await sendGbaTest(nazu, from);
+        } catch (e) {
+          console.error('[gbatest] Erro final ao processar comando:', e);
+          await reply('Falha ao enviar o teste GBA. Veja o console do bot para o ponto exato do erro.');
         }
         break;
       }

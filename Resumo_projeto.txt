@@ -476,3 +476,33 @@ Verificacoes:
 - Mock confirmou uma chamada a `relayMessage` com tres argumentos e `messageId` presente.
 - Mock confirmou canvas 240x160, `requestAnimationFrame(animateCanvas)`, os botoes +1/Reset e o botao de animacao dentro do HTML que chega ao primitive AIRich.
 - `package.json` e `package-lock.json` nao foram alterados.
+
+Data: 2026-09-11
+Objetivo:
+- Adicionar a prova minima `/gbatest`: AIRich com emulador GBA local, Canvas 240x160, controles virtuais e ROM de teste livre.
+
+Arquivos modificados/adicionados:
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- dados/src/funcs/private/gba/vendor/gbajs/ (subconjunto local do GBA.js e licenca BSD-2-Clause)
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Decisao tecnica:
+- Escolhido GBA.js (Jeffrey Pfau, BSD-2-Clause) por ser JavaScript puro, renderizar diretamente em Canvas 2D e exigir aproximadamente 285 KB do codigo necessario, sem CDN ou dependencias de runtime.
+- IodineGBA foi descartado por exigir um conjunto bem maior de fontes; gba-kit foi descartado por ser uma arquitetura TypeScript/WASM mais pesada para este primeiro teste em WebView.
+
+Alteracoes realizadas:
+- Criado `/gbatest`, separado de `/richtest`, reutilizando o mesmo payload AIRich e uma unica chamada `relayMessage(jid, richContent, { messageId })`.
+- Incluido apenas o subconjunto local necessario do GBA.js, inclusive sua licenca e BIOS HLE de 220 bytes fornecida pelo proprio projeto.
+- Criada uma ROM de teste Nazuna de 256 bytes, escrita localmente em ARM, que configura o modo 3 do GBA e preenche a tela vermelha. Ela nao contem ROM comercial, BIOS comercial ou assets de terceiros.
+- Incluidos Canvas 240x160, botoes direcionais, A, B, START e SELECT. Toque usa Pointer Events para alterar o estado do teclado virtual do emulador.
+- A emulacao inicia sob toque no botao Iniciar, evitando uma segunda animacao externa e permitindo que o WebView libere audio/execucao por gesto do usuario.
+
+Verificacoes:
+- `node --check` passou em `gbaTestHtml.js`, `pokemonRichHtml.js`, `index.js` e nos 15 arquivos JavaScript locais do GBA.js.
+- O gerador produziu HTML de 290381 bytes com Canvas `240x160`, codigo `new GameBoyAdvance()`, controles por Pointer Events e sem URL externa, CDN ou `<script src>`.
+- Mock de `/gbatest` confirmou uma unica chamada `relayMessage` com `jid`, `richContent` e `options.messageId`; o payload preserva `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIUnifiedResponse -> GenAIaeacdsnwHtmlPrimitive`.
+- Mock de `/richtest` confirmou que ele continua com uma unica chamada `relayMessage` e `messageId` presente.
+- Em sandbox local do GBA.js, a ROM foi aceita e executada ate gravar o primeiro pixel vermelho (`0x001f`) na VRAM.
+- `package.json` e `package-lock.json` permanecem semanticamente iguais a copia de publicacao; nenhuma dependencia foi adicionada.
+- A execucao dentro do WebView do WhatsApp Android ainda exige o teste manual de `/gbatest`; este ambiente nao reproduz esse cliente.
