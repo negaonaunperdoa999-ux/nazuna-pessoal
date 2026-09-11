@@ -456,3 +456,23 @@ Verificacoes:
 - `dados/src/funcs/private/pokemonRichHtml.js` passou em `node --check`.
 - Mock do socket confirmou uma unica chamada a `relayMessage` com tres argumentos (`jid`, `richContent`, `options`) e `options.messageId` como string presente.
 - Confirmada a preservacao do payload `botForwardedMessage` -> `richResponseMessage` -> `unifiedResponse` -> `GenAIUnifiedResponse` -> `GenAIaeacdsnwHtmlPrimitive` com HTML inline.
+
+Data: 2026-09-11
+Objetivo:
+- Ampliar o `/richtest` com uma prova isolada de Canvas e animacao JavaScript no WebView AIRich do WhatsApp Android.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado um canvas inline de 240x160 com fundo e grade simples.
+- Adicionado um quadrado animado por `requestAnimationFrame`, com movimento continuo e rebote nas laterais.
+- Adicionado o botao Iniciar/Pausar para controlar a animacao.
+- Mantidos o contador e os botoes +1/Reset, a estrutura AIRich e a unica chamada a `relayMessage`.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` passou em `node --check`.
+- Mock confirmou uma chamada a `relayMessage` com tres argumentos e `messageId` presente.
+- Mock confirmou canvas 240x160, `requestAnimationFrame(animateCanvas)`, os botoes +1/Reset e o botao de animacao dentro do HTML que chega ao primitive AIRich.
+- `package.json` e `package-lock.json` nao foram alterados.
