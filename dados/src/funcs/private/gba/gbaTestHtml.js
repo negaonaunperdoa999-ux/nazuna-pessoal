@@ -41,10 +41,10 @@ function writeWord(bytes, offset, value) {
   bytes[offset + 3] = (value >>> 24) & 0xff;
 }
 
-// ROM livre e minimo: configura o modo 3 e preenche a tela com vermelho.
+// ROM livre de demonstracao: repinta continuamente o framebuffer em cores rotativas.
 // O codigo ARM abaixo foi escrito para este teste; nao inclui BIOS, assets ou ROM comercial.
 function buildGbaTestRom() {
-  const rom = new Uint8Array(0x100);
+  const rom = new Uint8Array(0x140);
   const title = 'NAZUNA GBA TEST';
   for (let index = 0; index < title.length; index += 1) {
     rom[0xa0 + index] = title.charCodeAt(index);
@@ -57,21 +57,32 @@ function buildGbaTestRom() {
   rom[0xb2] = 0x96; // Assinatura minima exigida pelo carregador do GBA.js.
 
   writeWord(rom, 0x00, 0xea00002e); // branch para 0x080000c0
-  writeWord(rom, 0xc0, 0xe59f0020); // ldr r0, display control
-  writeWord(rom, 0xc4, 0xe59f1020); // ldr r1, mode 3 + BG2
+
+  writeWord(rom, 0xc0, 0xe59f0044); // ldr r0, display control
+  writeWord(rom, 0xc4, 0xe59f1044); // ldr r1, mode 3 + BG2
   writeWord(rom, 0xc8, 0xe1c010b0); // strh r1, [r0]
-  writeWord(rom, 0xcc, 0xe59f001c); // ldr r0, VRAM
-  writeWord(rom, 0xd0, 0xe59f101c); // ldr r1, two red pixels
-  writeWord(rom, 0xd4, 0xe59f201c); // ldr r2, number of words
+  writeWord(rom, 0xcc, 0xe59f0040); // ldr r0, VRAM
+  writeWord(rom, 0xd0, 0xe59f1040); // ldr r1, cor inicial (dois pixels)
+  writeWord(rom, 0xd4, 0xe59f2040); // ldr r2, 19200 palavras
   writeWord(rom, 0xd8, 0xe4801004); // str r1, [r0], #4
   writeWord(rom, 0xdc, 0xe2522001); // subs r2, r2, #1
   writeWord(rom, 0xe0, 0x1afffffc); // bne 0x080000d8
-  writeWord(rom, 0xe4, 0xeafffffe); // loop forever
-  writeWord(rom, 0xe8, 0x04000000);
-  writeWord(rom, 0xec, 0x00000403);
-  writeWord(rom, 0xf0, 0x06000000);
-  writeWord(rom, 0xf4, 0x001f001f);
-  writeWord(rom, 0xf8, 19200);
+  writeWord(rom, 0xe4, 0xe1a010e1); // mov r1, r1, ror #1: proxima cor
+  writeWord(rom, 0xe8, 0xe59f0024); // ldr r0, VRAM
+  writeWord(rom, 0xec, 0xe59f2028); // ldr r2, 19200 palavras
+  writeWord(rom, 0xf0, 0xe4801004); // str r1, [r0], #4
+  writeWord(rom, 0xf4, 0xe2522001); // subs r2, r2, #1
+  writeWord(rom, 0xf8, 0x1afffffc); // bne 0x080000f0
+  writeWord(rom, 0xfc, 0xe59f201c); // ldr r2, atraso visivel
+  writeWord(rom, 0x100, 0xe2522001); // subs r2, r2, #1
+  writeWord(rom, 0x104, 0x1afffffd); // bne 0x08000100
+  writeWord(rom, 0x108, 0xeafffff5); // b 0x080000e4
+  writeWord(rom, 0x10c, 0x04000000);
+  writeWord(rom, 0x110, 0x00000403);
+  writeWord(rom, 0x114, 0x06000000);
+  writeWord(rom, 0x118, 0x7c007c00);
+  writeWord(rom, 0x11c, 19200);
+  writeWord(rom, 0x120, 0x00010000);
   return rom;
 }
 

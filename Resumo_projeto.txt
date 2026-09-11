@@ -506,3 +506,23 @@ Verificacoes:
 - Em sandbox local do GBA.js, a ROM foi aceita e executada ate gravar o primeiro pixel vermelho (`0x001f`) na VRAM.
 - `package.json` e `package-lock.json` permanecem semanticamente iguais a copia de publicacao; nenhuma dependencia foi adicionada.
 - A execucao dentro do WebView do WhatsApp Android ainda exige o teste manual de `/gbatest`; este ambiente nao reproduz esse cliente.
+
+Data: 2026-09-11
+Objetivo:
+- Corrigir a demonstracao da ROM livre de `/gbatest` para evidenciar execucao continua do CPU e atualizacao do framebuffer.
+
+Arquivo modificado:
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- Resumo_projeto.txt
+
+Diagnostico e correcao:
+- A ROM anterior configurava o modo 3, preenchia a VRAM uma unica vez com vermelho e encerrava em `b .` (`0xEAFFFFFE`), portanto nao possuia animacao.
+- Substituida por uma ROM sintetica de 320 bytes que repinta os 240x160 pixels em cores rotativas e inclui um atraso deliberado para cada cor permanecer visivel.
+- Mantidos AIRich, HTML inline, Canvas 240x160, GBA.js local, uma mensagem e uma chamada `relayMessage` com `messageId`; `/richtest` nao foi alterado.
+
+Verificacoes:
+- O GBA.js aceitou a ROM; em sandbox, o CPU executou 12539081 ciclos e o video gerou 44 VBlanks.
+- Cinco amostras consecutivas do framebuffer foram diferentes (`0x3e00`, `0x1f00`, `0x0f80`, `0x07c0`, `0x03e0`), comprovando atualizacao continua da VRAM.
+- `node --check` passou em `gbaTestHtml.js`, `pokemonRichHtml.js` e `index.js`.
+- Mock confirmou uma unica chamada `relayMessage` de `/gbatest` e que `/richtest` permanece com uma unica chamada e `messageId`.
+- O HTML gerado permanece sem URL externa, CDN ou `<script src>`.
