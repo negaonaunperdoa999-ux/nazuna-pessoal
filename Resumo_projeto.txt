@@ -408,3 +408,28 @@ Verificacoes:
 
 Atualizacao nova:
 - O `/comer` foi alinhado ao comportamento original do Hutao, com a mesma mensagem e a midia em GIF/video reproduzido com `gifPlayback`.
+
+Data: 2026-09-11
+Objetivo:
+- Implementar e alinhar o teste `/richtest` de Rich HTML/AIRich ao fluxo funcional de jogos HTML da branch `9-beta` do Takeshi, preservando Baileys e a estrutura atual do Nazuna.
+
+Arquivos criados:
+- dados/src/funcs/private/pokemonRichHtml.js
+
+Arquivos modificados:
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Criado o comando `/richtest` e um modulo AIRich com HTML, CSS e JavaScript inline para contador e botoes +1/Reset.
+- O payload usa `botForwardedMessage` -> `richResponseMessage` -> `unifiedResponse` -> `GenAIUnifiedResponse` -> `GenAIaeacdsnwHtmlPrimitive`.
+- O envio usa uma unica chamada direta a `relayMessage(jid, payload)`.
+- Removidos `MESSAGE_EDIT`, `protocolMessage`, `generateWAMessageFromContent` e o `messageContextInfo` externo desse fluxo.
+- Mantidas as listas de contexto usadas pela referencia: `mentionedJid`, `groupMentions` e `statusAttributions`.
+
+Bugs corrigidos:
+- O teste deixou de emitir uma segunda mensagem de edicao que nao pertence ao fluxo funcional de referencia.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` e `dados/src/index.js` passaram em `node --check`.
+- Teste com socket simulado confirmou uma unica chamada a `relayMessage`, ausencia de `protocolMessage`, primitive correto e HTML contendo contador e botoes.
