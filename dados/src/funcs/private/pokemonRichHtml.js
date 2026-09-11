@@ -36,7 +36,7 @@ async function sendRichHtmlTest(sock, jid) {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
   const richContent = buildAIRichMessageContent(buildRichTestHtml(), { label: 'Rich HTML Test' });
   console.log('[richtest] Enviando uma unica botForwardedMessage.richResponseMessage...');
-  return sock.relayMessage(jid, richContent);
+  return sock.relayMessage(jid, richContent, { messageId: createId() });
 }
 
 export { HTML_PRIMITIVE, buildAIRichMessageContent, buildRichTestHtml, buildUnifiedResponse, sendRichHtmlTest };

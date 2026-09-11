@@ -433,3 +433,26 @@ Bugs corrigidos:
 Verificacoes:
 - `dados/src/funcs/private/pokemonRichHtml.js` e `dados/src/index.js` passaram em `node --check`.
 - Teste com socket simulado confirmou uma unica chamada a `relayMessage`, ausencia de `protocolMessage`, primitive correto e HTML contendo contador e botoes.
+
+Data: 2026-09-11
+Objetivo:
+- Corrigir a chamada direta de `relayMessage` do `/richtest` para o contrato do Baileys usado pelo Nazuna.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o terceiro argumento de opcoes ao envio AIRich: `{ messageId: createId() }`.
+- Reutilizada a funcao local `createId()`, que usa `crypto.randomUUID()` e possui fallback em `crypto.randomBytes()`.
+
+Bugs encontrados:
+- A chamada anterior tinha apenas `jid` e `richContent`; o Baileys tentava desestruturar `options.messageId` de um terceiro argumento indefinido.
+
+Bugs corrigidos:
+- O `/richtest` agora entrega as opcoes exigidas pelo `relayMessage` junto do `messageId` valido.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` passou em `node --check`.
+- Mock do socket confirmou uma unica chamada a `relayMessage` com tres argumentos (`jid`, `richContent`, `options`) e `options.messageId` como string presente.
+- Confirmada a preservacao do payload `botForwardedMessage` -> `richResponseMessage` -> `unifiedResponse` -> `GenAIUnifiedResponse` -> `GenAIaeacdsnwHtmlPrimitive` com HTML inline.
