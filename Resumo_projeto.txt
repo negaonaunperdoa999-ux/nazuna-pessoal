@@ -526,3 +526,37 @@ Verificacoes:
 - `node --check` passou em `gbaTestHtml.js`, `pokemonRichHtml.js` e `index.js`.
 - Mock confirmou uma unica chamada `relayMessage` de `/gbatest` e que `/richtest` permanece com uma unica chamada e `messageId`.
 - O HTML gerado permanece sem URL externa, CDN ou `<script src>`.
+
+Data: 2026-09-13
+Objetivo:
+- Criar um comando temporario `/airichprobe` para testar no WhatsApp iOS se `GenAIaeacdsnwHtmlPrimitive` renderiza HTML minimo e se `trusted_sources` influencia o comportamento.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o sender temporario `sendAirichProbe`, reaproveitando exatamente o mesmo envelope AIRich ja usado pelo `/richtest`.
+- O comando `/airichprobe` envia duas mensagens separadas com HTML contendo somente texto.
+- O primeiro teste usa `trusted_sources: []`.
+- O segundo teste usa `trusted_sources: ["nixel.dev"]`.
+- Cada mensagem registra no console tamanho do HTML, tamanho de `unifiedResponse.data`, `__typename` do primitive, quantidade de `trusted_sources`, chamadas de `relayMessage` e presenca de `messageId`.
+
+Codigos escritos ou modificados:
+- Criadas as funcoes `buildAirichProbeTextHtml`, `inspectAirichProbePayload` e `sendAirichProbe` em `pokemonRichHtml.js`.
+- Importado `sendAirichProbe` no `index.js`.
+- Adicionado o case `airichprobe` no switch principal.
+
+Bugs encontrados:
+- Nenhum bug novo confirmado nesta etapa.
+
+Bugs corrigidos:
+- Nenhum bug corrigido nesta etapa; a mudanca e um probe temporario de diagnostico.
+
+Verificacoes:
+- `node --check dados/src/funcs/private/pokemonRichHtml.js` passou.
+- `node --check dados/src/index.js` passou.
+- Mock confirmou duas chamadas totais a `relayMessage`, uma por mensagem.
+- Mock confirmou `messageId` presente nas duas mensagens.
+- Round-trip protobuf com o spec do Zapo confirmou que o primitive `GenAIaeacdsnwHtmlPrimitive` e o campo `trusted_sources` nao se perdem no encode/decode.
