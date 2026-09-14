@@ -560,3 +560,53 @@ Verificacoes:
 - Mock confirmou duas chamadas totais a `relayMessage`, uma por mensagem.
 - Mock confirmou `messageId` presente nas duas mensagens.
 - Round-trip protobuf com o spec do Zapo confirmou que o primitive `GenAIaeacdsnwHtmlPrimitive` e o campo `trusted_sources` nao se perdem no encode/decode.
+
+Data: 2026-09-14
+Objetivo:
+- Criar uma bateria de testes AIRich HTML para DOOM e GBA, preservando o `/richtest` ja validado no WhatsApp Android.
+
+Arquivos criados:
+- dados/src/funcs/private/doomRichHtml.js
+- .agents/airich-payload-test.mjs
+- .agents/backup-airich-20260914-113048/
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Criado `/doontest`, usando o mesmo envelope AIRich do `/richtest`, para validar controles completos de DOOM dentro do HTML: UP, DOWN, LEFT, RIGHT, STRAFE_LEFT, STRAFE_RIGHT, RUN, FIRE, USE, armas 1-7, TAB, ESC e ENTER.
+- O `/doontest` registra estado pressionado/solto, ultimo evento, total de eventos, pointer events, touch fallback, click fallback e teclado fisico quando o WebView permitir.
+- Criado `/doon`, uma primeira versao experimental de loader DOOM via AIRich HTML, Canvas/WebView e js-dos carregado por HTTPS.
+- O `/doon` nao embute IWAD/ROM proprietaria nem aponta para bundle comercial; ele aceita URL HTTPS `.jsdos`/`.zip` livre no argumento do comando ou pelo campo dentro do HTML.
+- Atualizado `/gbatest` sem substituir o GBA.js existente, mantendo a ROM livre sintetica e adicionando layout responsivo, modo retrato/paisagem, tela cheia/fallback expandido, botao de paisagem, FPS, estado do emulador e ultimo botao.
+- O `/gbatest` agora expoe controles A, B, START, SELECT, UP, DOWN, LEFT, RIGHT, L e R, usando a API existente do keypad do GBA.js (`currentDown` e `registerHandlers`).
+- Adicionado log de tamanho do HTML e do `unifiedResponse` para os payloads AIRich.
+
+Codigos escritos ou modificados:
+- `buildDoomTestHtml()` gera o painel completo de input para DOOM.
+- `buildDoomExperimentalHtml(bundleUrl)` gera o loader js-dos com controles touchscreen e campo de bundle livre.
+- `sendDoomInputTest()` e `sendDoomExperimental()` enviam uma unica mensagem AIRich com `relayMessage(jid, richContent, { messageId })`.
+- `getAirichPayloadStats()` e `logAirichPayloadStats()` centralizam verificacao de tamanho e primitive AIRich.
+- `buildGbaTestHtml()` foi ampliado com interface responsiva e controles completos.
+- `index.js` passou a importar os novos senders e adicionou os cases `/doontest` e `/doon`.
+
+Bugs encontrados:
+- O `node` do sistema nao esta no PATH; os testes precisaram usar o Node.js bundled do Codex.
+- O repositorio em pendrive acionou protecao de "dubious ownership" no Git local, entao foi usado backup local em `.agents` como commit logico antes das alteracoes.
+- Nao foi encontrado um bundle Freedoom `.jsdos` confiavel para embutir como padrao; apontar para um DOOM comercial seria incorreto.
+- A pasta `node_modules` nao existe no workspace, impedindo encode/decode WAProto real pelo pacote instalado; foi validado o round-trip dos bytes JSON usados atualmente por `unifiedResponse.data`.
+
+Bugs corrigidos:
+- Removido do `/doon` qualquer apontamento para conteudo possivelmente proprietario.
+- Evitada duplicacao de geracao do HTML do `/gbatest` ao calcular estatisticas.
+
+Verificacoes:
+- `node --check` passou em `pokemonRichHtml.js`, `doomRichHtml.js`, `gbaTestHtml.js`, `index.js` e nos 15 arquivos JavaScript locais do GBA.js.
+- Mock confirmou que `/richtest`, `/doontest`, `/doon` e `/gbatest` geram `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIUnifiedResponse -> GenAIaeacdsnwHtmlPrimitive`.
+- Mock confirmou uma unica chamada `relayMessage` por comando, JID de origem preservado e `options.messageId` valido.
+- Tamanhos aproximados: `/richtest` 2458 bytes HTML / 2792 bytes unifiedResponse; `/doontest` 9734 / 10601; `/doon` 11406 / 12302 com URL de exemplo; `/gbatest` 286794 / 316387.
+- Confirmado que os novos payloads nao usam envio de documento HTML.
+- Confirmado que `/richtest` continua usando o mesmo helper AIRich e uma unica chamada `relayMessage`.

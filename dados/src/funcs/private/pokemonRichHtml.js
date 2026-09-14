@@ -32,9 +32,41 @@ function buildAIRichMessageContent(html, options = {}) {
   return { botForwardedMessage: { message: { richResponseMessage: { messageType: AI_RICH_RESPONSE_TYPE_STANDARD, submessages: label ? [{ messageType: 2, messageText: label }] : [], unifiedResponse: { data: unifiedData }, contextInfo: { mentionedJid: [], groupMentions: [], statusAttributions: [], forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid }, forwardOrigin: 4 } } } } };
 }
 
+function getAirichPayloadStats(html, richContent) {
+  const richResponse = richContent?.botForwardedMessage?.message?.richResponseMessage;
+  const unifiedBytes = richResponse?.unifiedResponse?.data?.length || 0;
+  return {
+    htmlBytes: Buffer.byteLength(html || '', 'utf8'),
+    unifiedResponseBytes: unifiedBytes,
+    hasRichResponseMessage: !!richResponse,
+    hasHtmlPrimitive: (() => {
+      try {
+        const unified = JSON.parse(Buffer.from(richResponse.unifiedResponse.data).toString('utf8'));
+        return unified.sections?.[0]?.view_model?.primitive?.__typename === HTML_PRIMITIVE;
+      } catch {
+        return false;
+      }
+    })()
+  };
+}
+
+function logAirichPayloadStats(label, html, richContent) {
+  const stats = getAirichPayloadStats(html, richContent);
+  console.log(`[${label}] htmlBytes=${stats.htmlBytes}`);
+  console.log(`[${label}] unifiedResponseBytes=${stats.unifiedResponseBytes}`);
+  console.log(`[${label}] hasRichResponseMessage=${stats.hasRichResponseMessage}`);
+  console.log(`[${label}] hasHtmlPrimitive=${stats.hasHtmlPrimitive}`);
+  if (stats.htmlBytes > 900000 || stats.unifiedResponseBytes > 1000000) {
+    console.warn(`[${label}] Payload grande para AIRich/WebView; teste pode falhar no cliente.`);
+  }
+  return stats;
+}
+
 async function sendRichHtmlTest(sock, jid) {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
-  const richContent = buildAIRichMessageContent(buildRichTestHtml(), { label: 'Rich HTML Test' });
+  const html = buildRichTestHtml();
+  const richContent = buildAIRichMessageContent(html, { label: 'Rich HTML Test' });
+  logAirichPayloadStats('richtest', html, richContent);
   console.log('[richtest] Enviando uma unica botForwardedMessage.richResponseMessage...');
   return sock.relayMessage(jid, richContent, { messageId: createId() });
 }
@@ -85,4 +117,4 @@ async function sendAirichProbe(sock, jid) {
   return results;
 }
 
-export { HTML_PRIMITIVE, buildAIRichMessageContent, buildRichTestHtml, buildUnifiedResponse, sendAirichProbe, sendRichHtmlTest };
+export { HTML_PRIMITIVE, buildAIRichMessageContent, buildRichTestHtml, buildUnifiedResponse, createId, getAirichPayloadStats, logAirichPayloadStats, sendAirichProbe, sendRichHtmlTest };
