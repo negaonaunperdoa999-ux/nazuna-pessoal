@@ -17,19 +17,21 @@ function inspectAirichProbePayload(label, richContent, relayCalls, hasMessageId)
   console.log(`[airichprobe] hasMessageId=${hasMessageId}`);
 }
 
+const AIRICH_PROBE_SPECS = [
+  {
+    label: 'TESTE 1 - trusted_sources vazio',
+    trustedSources: []
+  },
+  {
+    label: 'TESTE 2 - trusted_sources nixel.dev',
+    trustedSources: ['nixel.dev']
+  }
+];
+
 async function sendAirichProbe(sock, jid) {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
 
-  const probes = [
-    {
-      label: 'TESTE 1 - trusted_sources vazio',
-      trustedSources: []
-    },
-    {
-      label: 'TESTE 2 - trusted_sources nixel.dev',
-      trustedSources: ['nixel.dev']
-    }
-  ];
+  const probes = AIRICH_PROBE_SPECS;
 
   const results = [];
   for (const probe of probes) {
@@ -46,4 +48,4 @@ async function sendAirichProbe(sock, jid) {
   return results;
 }
 
-export { buildAirichProbeTextHtml, inspectAirichProbePayload, sendAirichProbe };
+export { AIRICH_PROBE_SPECS, buildAirichProbeTextHtml, inspectAirichProbePayload, sendAirichProbe };
