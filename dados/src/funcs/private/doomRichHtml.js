@@ -1,4 +1,4 @@
-import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './pokemonRichHtml.js';
+import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
 
 const DOOM_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js';
 const DOOM_CSS_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.css';

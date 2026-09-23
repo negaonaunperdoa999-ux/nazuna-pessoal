@@ -1,6 +1,5 @@
-import crypto from 'crypto';
 import { readFileSync } from 'fs';
-import { buildAIRichMessageContent, logAirichPayloadStats } from '../pokemonRichHtml.js';
+import { buildAIRichMessageContent, createId, logAirichPayloadStats } from '../airich/sendAIRichHtml.js';
 
 const GBAJS_ROOT = new URL('./vendor/gbajs/', import.meta.url);
 const GBAJS_FILES = [
@@ -20,11 +19,6 @@ const GBAJS_FILES = [
   'js/gpio.js',
   'js/gba.js'
 ];
-
-function createId() {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return crypto.randomBytes(16).toString('hex');
-}
 
 function readLocalAsset(relativePath) {
   return readFileSync(new URL(relativePath, GBAJS_ROOT), 'utf8')
