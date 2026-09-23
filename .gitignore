@@ -1,0 +1,28 @@
+node_modules/
+.npm/
+*.zip
+*.log
+dados/logs/
+.codex/
+
+# Credenciais e ambiente
+.env
+*.env
+dados/src/config.json
+
+# Sessão Baileys, bancos e dados locais
+dados/database/
+
+# Logs e temporários
+logs/
+*.tmp
+*.temp
+tmp/
+temp/
+dados/midias/temp_*/
+
+# Backups locais de refatoração
+**/_backup_*/
+
+# Material potencialmente proprietário (BIOS GBA)
+dados/src/funcs/private/gba/vendor/gbajs/resources/bios.bin

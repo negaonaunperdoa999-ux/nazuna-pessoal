@@ -1,0 +1,612 @@
+Resumo do projeto
+=================
+
+Este arquivo registra automaticamente, ao final de cada tarefa realizada neste projeto, as alteracoes feitas, os codigos escritos ou modificados, e os bugs encontrados ou corrigidos.
+
+Regra de uso
+------------
+- Sempre que uma alteracao for concluida, adicionar uma nova entrada neste arquivo.
+- Cada entrada deve informar a data, o objetivo, os arquivos alterados, o que foi implementado, os bugs encontrados/corrigidos e qualquer verificacao feita.
+- Caso nenhuma mudanca de codigo seja feita em uma tarefa, registrar mesmo assim quando houver investigacao relevante, decisao tecnica ou bug identificado.
+
+Entradas
+--------
+
+Data: 2026-08-13
+Objetivo:
+- Criar o arquivo de acompanhamento do projeto solicitado pelo usuario.
+
+Arquivos criados:
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado um diario tecnico para registrar todas as alteracoes futuras feitas no projeto.
+- Definida a estrutura de registro com objetivo, arquivos alterados, implementacao, bugs e verificacoes.
+
+Codigos escritos ou modificados:
+- Nenhum codigo de aplicacao foi alterado nesta entrada.
+
+Bugs encontrados:
+- Nenhum bug encontrado nesta etapa.
+
+Bugs corrigidos:
+- Nenhum bug corrigido nesta etapa.
+
+Verificacoes:
+- Confirmado que o arquivo nao existia antes na raiz do projeto.
+
+Data: 2026-08-13
+Objetivo:
+- Renomear o comando /modoadv para /advlink sem alterar sua funcao.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuadm.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- O gatilho do comando foi alterado de case 'modoadv' para case 'advlink'.
+- O menu de administracao passou a exibir o comando advlink na secao de modos e ativacoes.
+- A logica interna e o campo salvo modoADV foram mantidos para preservar as configuracoes existentes dos grupos.
+
+Codigos escritos ou modificados:
+- Substituido o identificador publico do comando no switch principal.
+- Adicionada a linha ${prefix}advlink no menu administrativo.
+
+Bugs encontrados:
+- O comando antigo /modoadv ainda era o gatilho publico ativo.
+- O menu administrativo nao exibia o novo nome /advlink.
+
+Bugs corrigidos:
+- /modoadv deixou de ser reconhecido como comando.
+- /advlink passou a acionar a mesma funcao de modo advertencia.
+
+Verificacoes:
+- Confirmado com busca textual que modoadv nao aparece mais em dados/src, README.md, package.json ou startup.js.
+- Confirmado que advlink aparece no switch principal e no menu administrativo.
+- Tentativa de checagem com node --check falhou porque o Windows retornou "Acesso negado" ao executar node.exe.
+
+Data: 2026-08-13
+Objetivo:
+- Trazer do projeto Midnight os comandos /plaq1 ate /plaq7 com a mesma funcao de gerar plaquinhas por imagem remota, e deixar esses comandos acessiveis apenas para dono/VIP quando o modo18 estiver ativo.
+
+Arquivos criados:
+- dados/src/funcs/private/hutaoPlaques.js
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuvip.js
+- dados/src/menus/menuadm.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Lido o RESUMO_PROJETO.txt do projeto D:/Midnight para entender o contexto dos comandos VIP e modo18.
+- Copiada a logica dos comandos /plaq1, /plaq2, /plaq3, /plaq4, /plaq5, /plaq6 e /plaq7 para um novo modulo local.
+- Adicionados os cases /plaq1 ate /plaq7 no switch principal do bot.
+- Cada comando de plaquinha valida dono ou VIP antes de responder.
+- Cada comando de plaquinha exige grupo e exige que modo18/nsfw/mode18 esteja ativo no groupData.
+- Adicionado o comando /modo18 com aliases /nsfw e /mode18 para administradores ou dono ativarem/desativarem o modo +18 do grupo.
+- O /modo18 salva as flags modo18, nsfw e mode18 para manter compatibilidade.
+- O comando /menuvip agora exige dono ou VIP antes de exibir o menu.
+- O menu VIP foi substituido por uma lista direta dos comandos /plaq1 ate /plaq7.
+- O menu administrativo passou a listar /modo18 junto dos comandos de modo/ativacoes.
+
+Codigos escritos ou modificados:
+- Criado o modulo hutaoPlaques.js com PLAQ_COMMANDS, definicoes de limite/caption/url e funcoes getPlaqDefinition, buildPlaqUrl e fetchPlaqImageBuffer.
+- Importadas as funcoes de plaquinha no index.js.
+- Implementado o bloco de roteamento dos comandos /plaq1 ate /plaq7.
+- Implementado o bloco de roteamento do /modo18.
+- Reescrito o menuvip.js para renderizar somente os comandos VIP de plaquinha.
+
+Bugs encontrados:
+- Este projeto nao tinha o modulo hutaoPlaques.js nem os comandos /plaq1 ate /plaq7.
+- Este projeto nao tinha controle modo18/nsfw/mode18, necessario para liberar os comandos +18 com seguranca.
+- O /menuvip antigo dependia do cadastro dinamico de comandos VIP e poderia aparecer vazio para estes comandos transplantados.
+- node.exe do ambiente continua retornando "Acesso negado" quando chamado pelo PowerShell, impedindo node --check direto.
+
+Bugs corrigidos:
+- /plaq1 ate /plaq7 agora existem no bot e usam a mesma base de URLs do Midnight.
+- /menuvip agora mostra diretamente os comandos VIP de plaquinha.
+- /modo18 agora existe para ativar/desativar o modo +18 nos grupos.
+- Os comandos de plaquinha ficam bloqueados para nao VIPs, para PV e para grupos sem modo18 ativo.
+
+Verificacoes:
+- Confirmado com busca textual que /plaq1 ate /plaq7 aparecem no novo modulo, no menu VIP e no switch principal.
+- Confirmado com busca textual que /modo18 aparece no switch principal e no menu administrativo.
+- Confirmado que /menuvip possui bloqueio para usuarios que nao sao dono/VIP.
+- Importados hutaoPlaques.js e menuvip.js no runtime interno do Codex; ambos carregaram corretamente.
+- Validado no runtime interno que PLAQ_COMMANDS contem plaq1 ate plaq7, buildPlaqUrl insere o texto e o menu inclui /plaq1 e /modo18.
+- Tentativa de node --check via PowerShell falhou porque o Windows retornou "Acesso negado" ao executar node.exe.
+
+Data: 2026-08-13
+Objetivo:
+- Investigar relato de que o bot havia parado de responder comandos, mesmo sem erro no painel.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menuvip.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Revisados os trechos alterados anteriormente para procurar returns globais ou bloqueios antes do switch de comandos.
+- Confirmado que o sistema VIP dinamico nao estava bloqueando todos os comandos, pois vipCommands.json estava com a lista commands vazia.
+- Removido o bloqueio novo do /menuvip para evitar qualquer efeito colateral de permissao no menu.
+- Reescrito o menuvip.js com texto ASCII puro para reduzir risco de problema de encoding em hospedagem/painel.
+
+Codigos escritos ou modificados:
+- Removido do case /menuvip o retorno que exigia isPremium ou isOwner.
+- Substituido o layout do menuvip.js por uma versao ASCII simples listando plaq1 ate plaq7.
+
+Bugs encontrados:
+- O bot ficou temporariamente sem responder comandos, mas voltou a responder sem uma causa confirmada no painel.
+- node.exe continua inacessivel pelo PowerShell com "Acesso negado", impedindo checagem direta com node --check.
+
+Bugs corrigidos:
+- Possivel risco de bloqueio indesejado no /menuvip foi removido.
+- Possivel risco de encoding no menuvip.js foi reduzido usando ASCII puro.
+
+Verificacoes:
+- Revisados os blocos de /menuvip, /modo18 e /plaq1 ate /plaq7.
+- Confirmado que vipCommands.json nao tinha comandos VIP dinamicos ativos que pudessem bloquear tudo.
+
+Data: 2026-08-14
+Objetivo:
+- Migrar a base do modulo RPG para o estilo do HutaoBot-MD-main, ajustando menu, mensagens e bloqueios do Modo RPG.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menurpg.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Localizada a origem do modulo RPG no projeto HutaoBot-MD-main.
+- Substituido o menu RPG por uma versao mais alinhada ao HutaoBot, com seccoes de perfil, economia, atividades, combate, crafting, social e admin.
+- Centralizada a mensagem de bloqueio do Modo RPG em uma funcao unica para padronizar os retornos.
+- Ajustada a resposta do comando de ativacao/desativacao do Modo RPG para um texto mais proximo do estilo do HutaoBot.
+- Mantidos os comandos que o bot atual ja possui, para evitar que o menu mostre atalhos inexistentes.
+
+Codigos escritos ou modificados:
+- Reescrito o arquivo dados/src/menus/menurpg.js.
+- Adicionada a funcao rpgDisabledMessage(prefix) em dados/src/index.js.
+- Atualizado o case modorpg/rpgmode em dados/src/index.js.
+- Substituidas as mensagens repetidas de bloqueio do RPG para usar a funcao central.
+
+Bugs encontrados:
+- O bot principal nao tem uma copia local do modulo RPG do Midnight/HutaoBot na mesma arquitetura, entao a migracao precisou ser adaptada ao codigo atual.
+- Durante a troca em massa, parte do texto ficou com encoding quebrado e precisou de correcao manual.
+
+Bugs corrigidos:
+- A mensagem central de bloqueio do RPG foi corrigida para ASCII limpo.
+- As verificacoes de modo RPG voltaram a usar uma unica mensagem padronizada.
+
+Verificacoes:
+- Confirmado com busca textual que os bloqueios de RPG agora chamam rpgDisabledMessage(prefix).
+- Confirmado que o menu RPG novo foi gravado em dados/src/menus/menurpg.js.
+- Nao foi possivel validar com node --check, porque o ambiente nao possui o comando node reconhecido no PowerShell.
+
+Data: 2026-08-14
+Objetivo:
+- Ajustar o modo brincadeira (modobn) para ficar compatível com o estilo do HutaoBot-MD-main e evitar conflitos com futuros comandos.
+
+Arquivos modificados:
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigido o crash de inicializacao causado por identificador corrompido em um bloco de comandos do modo brincadeira.
+- Fechada a estrutura quebrada deixada apos a remocao do bloco de cozinha/RPG.
+- Atualizado o comando modobn para aceitar aliases equivalentes ao HutaoBot: modogamer e modo-gamer.
+- Espelhada a flag interna do modo brincadeira entre modobrincadeira e modog para manter compatibilidade.
+- Ajustadas as respostas de ativar/desativar o modo para o texto no estilo do HutaoBot.
+- Mantido o menu de brincadeiras como ponto de entrada do bloco, com novos aliases de menu.
+
+Codigos escritos ou modificados:
+- Ajuste do toggle do modo brincadeira em dados/src/index.js.
+- Inclusao de aliases adicionais para o menu em dados/src/index.js.
+- Atualizacao do resumo do projeto com esta rodada.
+
+Bugs encontrados:
+- O arquivo principal ainda contem varios trechos com encoding quebrado em strings, mas nem todos sao erros fatais.
+- A remocao do bloco de cozinha deixou um if do crime sem fechamento e isso quebrou o parse do arquivo.
+
+Bugs corrigidos:
+- Identificador corrompido normalizado para ASCII limpo.
+- Chave faltante do bloco crime restaurada.
+- Flags do modo brincadeira alinhadas entre os nomes antigo e novo.
+
+Verificacoes:
+- Confirmado que o bot usa agora os aliases modobn, modogamer e modo-gamer.
+- Confirmado que isModoBn aceita tanto groupData.modobrincadeira quanto groupData.modog.
+- Nao foi possivel executar node --check neste ambiente por ausencia do comando node.
+
+Data: 2026-08-17
+Objetivo:
+- Finalizar a sincronizacao dos comandos de brincadeira com o HutaoBot-MD-main do pendrive.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- dados/src/funcs/json/gamestext.json
+- dados/src/funcs/json/gamestext2.json
+- dados/src/funcs/utils/relationships.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Sincronizado o menu de brincadeiras com a versao do HutaoBot-MD-main.
+- Sincronizadas as tabelas de mensagens de `gamestext.json` e `gamestext2.json` com a versao do pendrive.
+- Sincronizada a logica de relacionamentos e pedidos do modo brincadeira com a base do HutaoBot-MD-main.
+- Ajustada a mensagem do `modobn` para o texto original do HutaoBot-MD-main.
+
+Codigos escritos ou modificados:
+- Atualizacao do bloco `modobn` em `dados/src/index.js`.
+- Substituicao dos arquivos de brincadeira pelos equivalentes do HutaoBot-MD-main.
+
+Bugs encontrados:
+- O PowerShell do ambiente nao manteve a sincronizacao por copia textual simples, por causa de encoding e leitura de arquivo.
+
+Bugs corrigidos:
+- A sincronizacao passou a ser feita por leitura binaria direta do ZIP, garantindo os mesmos bytes do pendrive.
+
+Verificacoes:
+- Confirmado por hash SHA-256 binario que `menubn.js`, `gamestext.json`, `gamestext2.json` e `relationships.js` ficaram identicos aos do HutaoBot-MD-main.
+- Confirmado com busca textual que a mensagem de ativacao/desativacao do `modobn` foi atualizada.
+
+Data: 2026-08-17
+Objetivo:
+- Normalizar textos do codigo para UTF-8 puro sem BOM e reduzir a corrompido de acentos e emojis.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/funcs/utils/gerarnick.js
+- dados/src/funcs/json/tools.json
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigidos os caracteres corrompidos que ainda apareciam no `index.js`, com foco em acentos, emojis e mensagens do bot.
+- Mantido o texto do `OWNER_ONLY_MESSAGE` em formato limpo e legivel.
+- Gravados os arquivos como UTF-8 puro sem BOM para evitar nova corrupcao na leitura.
+
+Codigos escritos ou modificados:
+- Ajuste de textos quebrados no `index.js`.
+- Limpeza de encoding em `gerarnick.js` e `tools.json`.
+- Correcao do titulo do menu de brincadeiras em `menubn.js`.
+
+Bugs encontrados:
+- Parte do texto do projeto ainda estava com encoding misturado, o que mantinha mensagens e comentarios corrompidos.
+
+Bugs corrigidos:
+- A camada principal de texto corrompido foi normalizada para UTF-8 sem BOM.
+- O `OWNER_ONLY_MESSAGE` ficou com o texto limpo e legivel.
+
+Verificacoes:
+- Confirmado com leitura UTF-8 que o texto limpo foi aplicado no trecho do `OWNER_ONLY_MESSAGE`.
+- Confirmado que os arquivos tocados foram regravados sem BOM.
+
+Data: 2026-08-17
+Objetivo:
+- Direcionar o comando `/atualizar` para o novo reservatório GitHub e deixar claro que a atualização preserva os dados existentes.
+
+Arquivos modificados:
+- dados/src/config.json
+- dados/src/.scripts/update.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Atualizada a URL oficial do repositório para `https://github.com/negaonaunperdoa999-ux/nazuna-pessoal`.
+- Ajustados os campos de identificacao do repositório para refletir o novo reservatório.
+- Tornado o script de update independente do nome antigo do repo, passando a derivar owner e repositório a partir da URL configurada.
+- Reescrito o aviso do `/atualizar` para deixar explícito que banco de dados, mídias e configurações locais são preservados.
+
+Codigos escritos ou modificados:
+- Ajuste da configuração GitHub em `config.json`.
+- Normalizacao da origem do clone e da busca do ultimo commit em `update.js`.
+- Refinamento da mensagem de aviso do comando `/atualizar` em `index.js`.
+
+Bugs encontrados:
+- A atualizacao ainda apontava para um repositório antigo e a mensagem do comando podia passar a impressao errada de perda de dados.
+
+Bugs corrigidos:
+- O `/atualizar` agora usa o reservatório atual como fonte de download.
+- O fluxo de update continua com backup automatico antes de aplicar as alteracoes.
+- O texto de aviso ficou alinhado com a preservacao dos dados existentes.
+
+Verificacoes:
+- Confirmado que o script de update continua criando backup antes do download.
+- Confirmado que as referencias GitHub agora apontam para `nazuna-pessoal`.
+- Ao final desta rodada, as alteracoes foram preparadas para commit e push no GitHub para manter o reservatorio sincronizado.
+
+Data: 2026-08-17
+Objetivo:
+- Corrigir a falha que impedia o carregamento completo de comandos sem derrubar o bot.
+
+Arquivos modificados:
+- dados/src/funcs/json/tools.json
+- dados/src/funcs/exports.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Corrigidas as aspas internas nao escapadas em `tools.json`, que estavam quebrando o parse do JSON.
+- Adicionado alias `Logos2` nos exports para compatibilidade com o `index.js`.
+
+Codigos escritos ou modificados:
+- Reparo sistematico do arquivo `tools.json`.
+- Alias `modules.Logos2 = modules.logos` em `exports.js`.
+
+Bugs encontrados:
+- O bot iniciava, mas o carregamento dos exports recebia um JSON invalido e parte do pipeline de comandos ficava comprometida.
+- O `index.js` pedia o export `Logos2`, mas esse alias nao existia.
+
+Bugs corrigidos:
+- `tools.json` voltou a ser JSON valido.
+- O alias de logos passou a existir tambem como `Logos2`.
+
+Verificacoes:
+- Confirmado por parse de JSON que `tools.json` agora carrega corretamente.
+- Confirmado que a quantidade de linhas corrigidas foi grande o bastante para cobrir as aspas literais espalhadas pelo arquivo.
+- Esta rodada tambem sera enviada ao GitHub ao final, mantendo o reservatorio sempre atualizado.
+
+Data: 2026-08-17
+Objetivo:
+- Integrar melhor o modo brincadeira (`modobn`) ao menu atual do Nazuna, mantendo a estrutura em `dados/src/`.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Removido o alias quebrado `viaja nte` do bloco do `modobn` em `index.js`.
+- Atualizado o `menubn.js` para exibir comandos que ainda nao apareciam no menu, incluindo `suruba`, `pirokudo`, `organizada` e aliases adicionais de ranking.
+- Mantida a organizacao atual do menu, sem quebrar os carregadores ESM existentes.
+
+Codigos escritos ou modificados:
+- Ajuste do case do `modobn` em `dados/src/index.js`.
+- Expansao das secoes de brincadeiras, rankings masculino/feminino e interacoes picantes em `dados/src/menus/menubn.js`.
+
+Bugs encontrados:
+- O menu de brincadeiras nao mostrava todos os comandos expostos pelo modo brincadeira.
+- Existia um alias corrompido (`viaja nte`) no bloco do modo brincadeira.
+
+Bugs corrigidos:
+- Os comandos de brincadeira agora aparecem de forma mais completa no `menubn`.
+- O alias corrompido foi removido do `index.js`.
+
+Verificacoes:
+- `index.js`, `menubn.js` e `menuadm.js` passaram no parse com `tree-sitter-javascript`.
+- Confirmado que `index.js`, `menubn.js`, `menuadm.js` e `Resumo_projeto.txt` ficaram sem BOM.
+
+Data: 2026-08-17
+Objetivo:
+- Corrigir a ausencia do comando `/comer` no modo brincadeira e manter o menu do `modobn` alinhado ao que o bot executa.
+
+Arquivos modificados:
+- dados/src/index.js
+- dados/src/menus/menubn.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o comando `/comer` ao bloco de interacoes do `modobn` em `index.js`.
+- Criada uma resposta propria para `/comer` quando o comando for executado.
+- Exibido `/comer` na secao de interacoes picantes do `menubn`.
+
+Codigos escritos ou modificados:
+- Inclusao do `case 'comer'` no roteamento principal.
+- Ajuste do menu de brincadeiras para mostrar o novo comando.
+
+Bugs encontrados:
+- O `/comer` nao existia nem no handler principal nem no menu.
+
+Bugs corrigidos:
+- `/comer` agora responde no bot.
+- `/comer` agora aparece no `menubn`.
+
+Verificacoes:
+- Mantido o bloqueio de `modo lite` para comandos improprios.
+- O comando segue exigindo grupo, `modobn` ativo e usuario marcado.
+
+Atualizacao nova:
+- O `/comer` foi alinhado ao comportamento original do Hutao, com a mesma mensagem e a midia em GIF/video reproduzido com `gifPlayback`.
+
+Data: 2026-09-11
+Objetivo:
+- Implementar e alinhar o teste `/richtest` de Rich HTML/AIRich ao fluxo funcional de jogos HTML da branch `9-beta` do Takeshi, preservando Baileys e a estrutura atual do Nazuna.
+
+Arquivos criados:
+- dados/src/funcs/private/pokemonRichHtml.js
+
+Arquivos modificados:
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Criado o comando `/richtest` e um modulo AIRich com HTML, CSS e JavaScript inline para contador e botoes +1/Reset.
+- O payload usa `botForwardedMessage` -> `richResponseMessage` -> `unifiedResponse` -> `GenAIUnifiedResponse` -> `GenAIaeacdsnwHtmlPrimitive`.
+- O envio usa uma unica chamada direta a `relayMessage(jid, payload)`.
+- Removidos `MESSAGE_EDIT`, `protocolMessage`, `generateWAMessageFromContent` e o `messageContextInfo` externo desse fluxo.
+- Mantidas as listas de contexto usadas pela referencia: `mentionedJid`, `groupMentions` e `statusAttributions`.
+
+Bugs corrigidos:
+- O teste deixou de emitir uma segunda mensagem de edicao que nao pertence ao fluxo funcional de referencia.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` e `dados/src/index.js` passaram em `node --check`.
+- Teste com socket simulado confirmou uma unica chamada a `relayMessage`, ausencia de `protocolMessage`, primitive correto e HTML contendo contador e botoes.
+
+Data: 2026-09-11
+Objetivo:
+- Corrigir a chamada direta de `relayMessage` do `/richtest` para o contrato do Baileys usado pelo Nazuna.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o terceiro argumento de opcoes ao envio AIRich: `{ messageId: createId() }`.
+- Reutilizada a funcao local `createId()`, que usa `crypto.randomUUID()` e possui fallback em `crypto.randomBytes()`.
+
+Bugs encontrados:
+- A chamada anterior tinha apenas `jid` e `richContent`; o Baileys tentava desestruturar `options.messageId` de um terceiro argumento indefinido.
+
+Bugs corrigidos:
+- O `/richtest` agora entrega as opcoes exigidas pelo `relayMessage` junto do `messageId` valido.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` passou em `node --check`.
+- Mock do socket confirmou uma unica chamada a `relayMessage` com tres argumentos (`jid`, `richContent`, `options`) e `options.messageId` como string presente.
+- Confirmada a preservacao do payload `botForwardedMessage` -> `richResponseMessage` -> `unifiedResponse` -> `GenAIUnifiedResponse` -> `GenAIaeacdsnwHtmlPrimitive` com HTML inline.
+
+Data: 2026-09-11
+Objetivo:
+- Ampliar o `/richtest` com uma prova isolada de Canvas e animacao JavaScript no WebView AIRich do WhatsApp Android.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado um canvas inline de 240x160 com fundo e grade simples.
+- Adicionado um quadrado animado por `requestAnimationFrame`, com movimento continuo e rebote nas laterais.
+- Adicionado o botao Iniciar/Pausar para controlar a animacao.
+- Mantidos o contador e os botoes +1/Reset, a estrutura AIRich e a unica chamada a `relayMessage`.
+
+Verificacoes:
+- `dados/src/funcs/private/pokemonRichHtml.js` passou em `node --check`.
+- Mock confirmou uma chamada a `relayMessage` com tres argumentos e `messageId` presente.
+- Mock confirmou canvas 240x160, `requestAnimationFrame(animateCanvas)`, os botoes +1/Reset e o botao de animacao dentro do HTML que chega ao primitive AIRich.
+- `package.json` e `package-lock.json` nao foram alterados.
+
+Data: 2026-09-11
+Objetivo:
+- Adicionar a prova minima `/gbatest`: AIRich com emulador GBA local, Canvas 240x160, controles virtuais e ROM de teste livre.
+
+Arquivos modificados/adicionados:
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- dados/src/funcs/private/gba/vendor/gbajs/ (subconjunto local do GBA.js e licenca BSD-2-Clause)
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Decisao tecnica:
+- Escolhido GBA.js (Jeffrey Pfau, BSD-2-Clause) por ser JavaScript puro, renderizar diretamente em Canvas 2D e exigir aproximadamente 285 KB do codigo necessario, sem CDN ou dependencias de runtime.
+- IodineGBA foi descartado por exigir um conjunto bem maior de fontes; gba-kit foi descartado por ser uma arquitetura TypeScript/WASM mais pesada para este primeiro teste em WebView.
+
+Alteracoes realizadas:
+- Criado `/gbatest`, separado de `/richtest`, reutilizando o mesmo payload AIRich e uma unica chamada `relayMessage(jid, richContent, { messageId })`.
+- Incluido apenas o subconjunto local necessario do GBA.js, inclusive sua licenca e BIOS HLE de 220 bytes fornecida pelo proprio projeto.
+- Criada uma ROM de teste Nazuna de 256 bytes, escrita localmente em ARM, que configura o modo 3 do GBA e preenche a tela vermelha. Ela nao contem ROM comercial, BIOS comercial ou assets de terceiros.
+- Incluidos Canvas 240x160, botoes direcionais, A, B, START e SELECT. Toque usa Pointer Events para alterar o estado do teclado virtual do emulador.
+- A emulacao inicia sob toque no botao Iniciar, evitando uma segunda animacao externa e permitindo que o WebView libere audio/execucao por gesto do usuario.
+
+Verificacoes:
+- `node --check` passou em `gbaTestHtml.js`, `pokemonRichHtml.js`, `index.js` e nos 15 arquivos JavaScript locais do GBA.js.
+- O gerador produziu HTML de 290381 bytes com Canvas `240x160`, codigo `new GameBoyAdvance()`, controles por Pointer Events e sem URL externa, CDN ou `<script src>`.
+- Mock de `/gbatest` confirmou uma unica chamada `relayMessage` com `jid`, `richContent` e `options.messageId`; o payload preserva `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIUnifiedResponse -> GenAIaeacdsnwHtmlPrimitive`.
+- Mock de `/richtest` confirmou que ele continua com uma unica chamada `relayMessage` e `messageId` presente.
+- Em sandbox local do GBA.js, a ROM foi aceita e executada ate gravar o primeiro pixel vermelho (`0x001f`) na VRAM.
+- `package.json` e `package-lock.json` permanecem semanticamente iguais a copia de publicacao; nenhuma dependencia foi adicionada.
+- A execucao dentro do WebView do WhatsApp Android ainda exige o teste manual de `/gbatest`; este ambiente nao reproduz esse cliente.
+
+Data: 2026-09-11
+Objetivo:
+- Corrigir a demonstracao da ROM livre de `/gbatest` para evidenciar execucao continua do CPU e atualizacao do framebuffer.
+
+Arquivo modificado:
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- Resumo_projeto.txt
+
+Diagnostico e correcao:
+- A ROM anterior configurava o modo 3, preenchia a VRAM uma unica vez com vermelho e encerrava em `b .` (`0xEAFFFFFE`), portanto nao possuia animacao.
+- Substituida por uma ROM sintetica de 320 bytes que repinta os 240x160 pixels em cores rotativas e inclui um atraso deliberado para cada cor permanecer visivel.
+- Mantidos AIRich, HTML inline, Canvas 240x160, GBA.js local, uma mensagem e uma chamada `relayMessage` com `messageId`; `/richtest` nao foi alterado.
+
+Verificacoes:
+- O GBA.js aceitou a ROM; em sandbox, o CPU executou 12539081 ciclos e o video gerou 44 VBlanks.
+- Cinco amostras consecutivas do framebuffer foram diferentes (`0x3e00`, `0x1f00`, `0x0f80`, `0x07c0`, `0x03e0`), comprovando atualizacao continua da VRAM.
+- `node --check` passou em `gbaTestHtml.js`, `pokemonRichHtml.js` e `index.js`.
+- Mock confirmou uma unica chamada `relayMessage` de `/gbatest` e que `/richtest` permanece com uma unica chamada e `messageId`.
+- O HTML gerado permanece sem URL externa, CDN ou `<script src>`.
+
+Data: 2026-09-13
+Objetivo:
+- Criar um comando temporario `/airichprobe` para testar no WhatsApp iOS se `GenAIaeacdsnwHtmlPrimitive` renderiza HTML minimo e se `trusted_sources` influencia o comportamento.
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Adicionado o sender temporario `sendAirichProbe`, reaproveitando exatamente o mesmo envelope AIRich ja usado pelo `/richtest`.
+- O comando `/airichprobe` envia duas mensagens separadas com HTML contendo somente texto.
+- O primeiro teste usa `trusted_sources: []`.
+- O segundo teste usa `trusted_sources: ["nixel.dev"]`.
+- Cada mensagem registra no console tamanho do HTML, tamanho de `unifiedResponse.data`, `__typename` do primitive, quantidade de `trusted_sources`, chamadas de `relayMessage` e presenca de `messageId`.
+
+Codigos escritos ou modificados:
+- Criadas as funcoes `buildAirichProbeTextHtml`, `inspectAirichProbePayload` e `sendAirichProbe` em `pokemonRichHtml.js`.
+- Importado `sendAirichProbe` no `index.js`.
+- Adicionado o case `airichprobe` no switch principal.
+
+Bugs encontrados:
+- Nenhum bug novo confirmado nesta etapa.
+
+Bugs corrigidos:
+- Nenhum bug corrigido nesta etapa; a mudanca e um probe temporario de diagnostico.
+
+Verificacoes:
+- `node --check dados/src/funcs/private/pokemonRichHtml.js` passou.
+- `node --check dados/src/index.js` passou.
+- Mock confirmou duas chamadas totais a `relayMessage`, uma por mensagem.
+- Mock confirmou `messageId` presente nas duas mensagens.
+- Round-trip protobuf com o spec do Zapo confirmou que o primitive `GenAIaeacdsnwHtmlPrimitive` e o campo `trusted_sources` nao se perdem no encode/decode.
+
+Data: 2026-09-14
+Objetivo:
+- Criar uma bateria de testes AIRich HTML para DOOM e GBA, preservando o `/richtest` ja validado no WhatsApp Android.
+
+Arquivos criados:
+- dados/src/funcs/private/doomRichHtml.js
+- .agents/airich-payload-test.mjs
+- .agents/backup-airich-20260914-113048/
+
+Arquivos modificados:
+- dados/src/funcs/private/pokemonRichHtml.js
+- dados/src/funcs/private/gba/gbaTestHtml.js
+- dados/src/index.js
+- Resumo_projeto.txt
+
+Alteracoes realizadas:
+- Criado `/doontest`, usando o mesmo envelope AIRich do `/richtest`, para validar controles completos de DOOM dentro do HTML: UP, DOWN, LEFT, RIGHT, STRAFE_LEFT, STRAFE_RIGHT, RUN, FIRE, USE, armas 1-7, TAB, ESC e ENTER.
+- O `/doontest` registra estado pressionado/solto, ultimo evento, total de eventos, pointer events, touch fallback, click fallback e teclado fisico quando o WebView permitir.
+- Criado `/doon`, uma primeira versao experimental de loader DOOM via AIRich HTML, Canvas/WebView e js-dos carregado por HTTPS.
+- O `/doon` nao embute IWAD/ROM proprietaria nem aponta para bundle comercial; ele aceita URL HTTPS `.jsdos`/`.zip` livre no argumento do comando ou pelo campo dentro do HTML.
+- Atualizado `/gbatest` sem substituir o GBA.js existente, mantendo a ROM livre sintetica e adicionando layout responsivo, modo retrato/paisagem, tela cheia/fallback expandido, botao de paisagem, FPS, estado do emulador e ultimo botao.
+- O `/gbatest` agora expoe controles A, B, START, SELECT, UP, DOWN, LEFT, RIGHT, L e R, usando a API existente do keypad do GBA.js (`currentDown` e `registerHandlers`).
+- Adicionado log de tamanho do HTML e do `unifiedResponse` para os payloads AIRich.
+
+Codigos escritos ou modificados:
+- `buildDoomTestHtml()` gera o painel completo de input para DOOM.
+- `buildDoomExperimentalHtml(bundleUrl)` gera o loader js-dos com controles touchscreen e campo de bundle livre.
+- `sendDoomInputTest()` e `sendDoomExperimental()` enviam uma unica mensagem AIRich com `relayMessage(jid, richContent, { messageId })`.
+- `getAirichPayloadStats()` e `logAirichPayloadStats()` centralizam verificacao de tamanho e primitive AIRich.
+- `buildGbaTestHtml()` foi ampliado com interface responsiva e controles completos.
+- `index.js` passou a importar os novos senders e adicionou os cases `/doontest` e `/doon`.
+
+Bugs encontrados:
+- O `node` do sistema nao esta no PATH; os testes precisaram usar o Node.js bundled do Codex.
+- O repositorio em pendrive acionou protecao de "dubious ownership" no Git local, entao foi usado backup local em `.agents` como commit logico antes das alteracoes.
+- Nao foi encontrado um bundle Freedoom `.jsdos` confiavel para embutir como padrao; apontar para um DOOM comercial seria incorreto.
+- A pasta `node_modules` nao existe no workspace, impedindo encode/decode WAProto real pelo pacote instalado; foi validado o round-trip dos bytes JSON usados atualmente por `unifiedResponse.data`.
+
+Bugs corrigidos:
+- Removido do `/doon` qualquer apontamento para conteudo possivelmente proprietario.
+- Evitada duplicacao de geracao do HTML do `/gbatest` ao calcular estatisticas.
+
+Verificacoes:
+- `node --check` passou em `pokemonRichHtml.js`, `doomRichHtml.js`, `gbaTestHtml.js`, `index.js` e nos 15 arquivos JavaScript locais do GBA.js.
+- Mock confirmou que `/richtest`, `/doontest`, `/doon` e `/gbatest` geram `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIUnifiedResponse -> GenAIaeacdsnwHtmlPrimitive`.
+- Mock confirmou uma unica chamada `relayMessage` por comando, JID de origem preservado e `options.messageId` valido.
+- Tamanhos aproximados: `/richtest` 2458 bytes HTML / 2792 bytes unifiedResponse; `/doontest` 9734 / 10601; `/doon` 11406 / 12302 com URL de exemplo; `/gbatest` 286794 / 316387.
+- Confirmado que os novos payloads nao usam envio de documento HTML.
+- Confirmado que `/richtest` continua usando o mesmo helper AIRich e uma unica chamada `relayMessage`.
