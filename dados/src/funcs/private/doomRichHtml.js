@@ -180,7 +180,7 @@ function startDoom(){
   }catch(e){setStatus('Erro ao carregar DOOM','error')}
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()};`;
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="${DOOM_CSS_URL}"><style>${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><link rel="stylesheet" href="${DOOM_CSS_URL}"><style>${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
 <div class="doom-status" id="doomStatus" data-state="">Carregando DOOM...</div>
 <section class="stage" aria-label="Jogo"><div id="dosbox"></div></section>
 ${buildDoomPlayerControlsHtml()}
