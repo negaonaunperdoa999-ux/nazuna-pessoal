@@ -3,14 +3,33 @@ import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './ai
 import { buildDoomOrientationCss, buildDoomOrientationScript } from './doom/doomOrientation.js';
 
 const JSDOS_ROOT = new URL('./doom/vendor/jsdos/', import.meta.url);
+const DOOM_ASSETS_ROOT = new URL('./doom/assets/', import.meta.url);
 
 function readDoomAsset(relativePath) {
   return readFileSync(new URL(relativePath, JSDOS_ROOT), 'utf8')
     .replace(/<\/script/gi, '<\\/script');
 }
 
+function readDoomAssetB64(relativePath) {
+  return readFileSync(new URL(relativePath, JSDOS_ROOT)).toString('base64');
+}
+
+function readDoomBundleB64() {
+  return readFileSync(new URL('doom.jsdos', DOOM_ASSETS_ROOT)).toString('base64');
+}
+
+function toJsStringLiteral(value) {
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/`/g, '\\u0060')
+    .replace(/\$\{/g, '$\\u007b');
+}
+
 const JSDOS_JS = readDoomAsset('js-dos.js');
 const JSDOS_CSS = readDoomAsset('js-dos.css');
+const WDOSBOX_JS = readDoomAsset('wdosbox.js');
+const WDOSBOX_WASM_B64 = readDoomAssetB64('wdosbox.wasm');
 
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
 const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
@@ -171,30 +190,214 @@ function buildDoomPlayerControlsHtml() {
 </div>`;
 }
 
-function buildDoomPlayerHtml(bundleUrl = '') {
-  const bundle = /^https:\/\/\S+\.jsdos(?:[?#].*)?$/.test(String(bundleUrl || '').trim()) ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
-  const bridge = `
+function buildDoomDiagnosticCss() {
+  return `
+.doom-diagnostics{grid-area:diag;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:14px}
+.doom-dbg{display:none;width:100%;max-height:120px;overflow:auto;-webkit-overflow-scrolling:touch;text-align:left;color:#9fb6c3;font:10px/1.4 Consolas,Monaco,monospace;background:rgba(0,0,0,0.55);border:1px solid #2a3c49;border-radius:6px;padding:4px 6px;white-space:pre-wrap;word-break:break-word}
+.doom-dbg.show{display:block}`;
+}
+
+function buildDoomPlayerBridge(bundleUrl, options) {
+  const embedWdosbox = options.embedWdosbox !== false;
+  const embedBundle = options.embedBundle === true;
+  const wdosboxJsLiteral = embedWdosbox ? toJsStringLiteral(WDOSBOX_JS) : 'null';
+  const wasmB64Literal = embedWdosbox ? JSON.stringify(WDOSBOX_WASM_B64) : 'null';
+  const bundleB64Literal = embedBundle ? JSON.stringify(readDoomBundleB64()) : 'null';
+  const bundleLiteral = JSON.stringify(bundleUrl);
+  return `
 const doomStatus=document.getElementById('doomStatus');
 const dosbox=document.getElementById('dosbox');
-function setStatus(t,s){if(!doomStatus)return;doomStatus.textContent=t;doomStatus.setAttribute('data-state',s||'')}
+const __L=window.__doomLocal={};
+__L.embedded=${embedWdosbox?true:false};
+__L.wdosboxJs=${wdosboxJsLiteral};
+__L.wasmB64=${wasmB64Literal};
+__L.bundleB64=${bundleB64Literal};
+__L.bundleUrl=${bundleLiteral};
+
+function pad2(v){v=String(v);return v.length<2?'0'+v:v}
+function dbg(msg){
+  const dbgEl=document.getElementById('doomDbg');
+  if(!dbgEl)return;
+  try{
+    if(msg&&typeof msg==='object'){msg=(msg.name?msg.name+': ':'')+(msg.message||String(msg))}
+    const line=String(msg);
+    if(dbgEl.childElementCount>200){dbgEl.textContent=''}
+    const t=new Date();
+    const stamp='['+pad2(t.getHours())+':'+pad2(t.getMinutes())+':'+pad2(t.getSeconds())+'] ';
+    dbgEl.textContent+=stamp+line+'\\n';
+    dbgEl.scrollTop=dbgEl.scrollHeight;
+    if(!dbgEl.classList.contains('show'))dbgEl.classList.add('show');
+  }catch(_){}
+}
+function setStatus(t,s){if(!doomStatus)return;doomStatus.textContent=t;doomStatus.setAttribute('data-state',s||'');dbg('status: '+t)}
 function sendKey(keyCode,down){const type=down?'keydown':'keyup';const ev=new KeyboardEvent(type,{keyCode:keyCode,which:keyCode,bubbles:true});Object.defineProperty(ev,'keyCode',{get:()=>keyCode});Object.defineProperty(ev,'which',{get:()=>keyCode});window.dispatchEvent(ev);document.dispatchEvent(ev)}
 window.doomInputBridge=function(info,pressed){sendKey(info.keyCode,pressed)};
 [['esc',27],['tab',9],['enter',13]].forEach(function(pair){const el=document.getElementById(pair[0]);if(!el)return;el.addEventListener('pointerdown',e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId)}catch{}sendKey(pair[1],true)});const up=e=>{e.preventDefault();sendKey(pair[1],false)};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('click',e=>{e.preventDefault();setTimeout(()=>sendKey(pair[1],false),80)})});
+
+function fromB64(b64){let bin;try{bin=atob(b64)}catch(e){return null}const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++){u[i]=bin.charCodeAt(i)}return u}
+if(__L.wasmB64){try{__L.wasmBytes=fromB64(__L.wasmB64);dbg('wdosbox.wasm embutido: '+((__L.wasmBytes&&__L.wasmBytes.length)||0)+' bytes')}catch(e){dbg('wasm decode falhou: '+((e&&e.message)||String(e)))}}
+if(__L.bundleB64){try{__L.bundleBytes=fromB64(__L.bundleB64);dbg('bundle embutido: '+((__L.bundleBytes&&__L.bundleBytes.length)||0)+' bytes')}catch(e){dbg('bundle decode falhou: '+((e&&e.message)||String(e)))}}
+
+window.addEventListener('error',function(e){dbg('global error: '+((e&&e.message)||String(e)))},true);
+window.addEventListener('unhandledrejection',function(e){const r=e&&e.reason;dbg('promise rejection: '+((r&&r.message)?(r.name?r.name+': ':'')+r.message:String(r)))},true);
+(function(){
+  const oe=console.error,ow=console.warn;
+  console.error=function(){const a=[].slice.call(arguments);try{dbg('console.error: '+a.map(function(x){try{return x&&x.message?(x.name?x.name+': ':'')+x.message:String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};oe.apply(console,arguments)};
+  console.warn=function(){const a=[].slice.call(arguments);try{dbg('console.warn: '+a.map(function(x){try{return String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};ow.apply(console,arguments)};
+})();
+
+let wasmOK=false,wasmErr='';
+try{
+  if(typeof WebAssembly!=='object'||typeof WebAssembly.instantiate!=='function'||typeof WebAssembly.compile!=='function'){throw new Error('WebAssembly invalido neste WebView')}
+  new WebAssembly.Module(new Uint8Array([0,97,115,109,1,0,0,0]));
+  wasmOK=true;
+}catch(e){wasmErr=(e&&e.message)||String(e)}
+dbg('WASM: '+(wasmOK?'disponivel':'FALHA - '+wasmErr));
+
+let workerOK=false,workerErr='';
+try{
+  if(typeof Worker!=='function'||typeof Blob!=='function'||typeof URL!=='object'||typeof URL.createObjectURL!=='function'){throw new Error('Worker/Blob/URL indisponiveis')}
+  const wProbe=new Worker(URL.createObjectURL(new Blob([''],{type:'text/javascript'})));
+  wProbe.terminate();
+  workerOK=true;
+}catch(e){workerErr=(e&&e.message)||String(e)}
+dbg('Worker: '+(workerOK?'disponivel':'FALHA - '+workerErr));
+const emuFn=workerOK?'dosboxWorker':'dosboxDirect';
+dbg('emulatorFunction: '+emuFn);
+
+const OrigXHR=window.XMLHttpRequest;
+if(__L.embedded&&OrigXHR&&(__L.wdosboxJs||__L.wasmBytes||__L.bundleBytes)){
+  window.XMLHttpRequest=(function(){
+    function Fake(){
+      this._listeners={};
+      this.readyState=0;this.status=0;this.statusText='';
+      this.responseType='';this.response=null;this.responseText='';
+      this.onreadystatechange=null;this.onerror=null;this.onload=null;this.onabort=null;this.onprogress=null;
+      this.upload={addEventListener:function(){},removeEventListener:function(){}};
+      this._url='';this._method='GET';this._sent=false;this._done=false;this._aborted=false;this._real=null;
+    }
+    Fake.prototype.addEventListener=function(t,cb){(this._listeners[t]=this._listeners[t]||[]).push(cb)};
+    Fake.prototype.removeEventListener=function(t,cb){const a=this._listeners[t];if(!a)return;const i=a.indexOf(cb);if(i>=0)a.splice(i,1)};
+    Fake.prototype._fire=function(t){
+      const ev={type:t,target:this,currentTarget:this};
+      if(t==='progress'){ev.total=this.total||0;ev.loaded=this.loaded||0;ev.lengthComputable=true}
+      const h=this['on'+t];
+      if(typeof h==='function'){try{h.call(this,ev)}catch(_){}}
+      const a=this._listeners[t]||[];
+      for(let i=0;i<a.length;i++){try{a[i].call(this,ev)}catch(_){}}
+    };
+    Fake.prototype.open=function(m,u){this._method=m||'GET';this._url=String(u||'');this.readyState=1};
+    Fake.prototype.setRequestHeader=function(){};
+    Fake.prototype.overrideMimeType=function(){};
+    Fake.prototype.abort=function(){this._aborted=true;if(this._sent&&!this._done){this.readyState=4;this._fire('abort')}};
+    Fake.prototype.send=function(){
+      this._sent=true;
+      const self=this;
+      const url=self._url;
+      const lower=String(url).toLowerCase().replace(/[?#].*$/,'');
+      let localKind=null;
+      if(__L.wasmBytes&&/wdosbox\\.wasm$/i.test(lower)){localKind='wasm'}
+      else if(__L.wdosboxJs&&/wdosbox\\.js$/i.test(lower)){localKind='js'}
+      else if(__L.bundleBytes&&/\\.jsdos$/i.test(lower)){localKind='bundle'}
+      if(localKind){
+        dbg('XHR local ['+localKind+']: '+url);
+        setTimeout(function(){
+          if(self._aborted)return;
+          self.readyState=4;self.status=200;self.statusText='OK';self._done=true;
+          if(localKind==='js'){self.responseText=__L.wdosboxJs;self.response=__L.wdosboxJs}
+          else{
+            const u=localKind==='wasm'?__L.wasmBytes:__L.bundleBytes;
+            try{self.response=u.buffer.slice(u.byteOffset,u.byteOffset+u.byteLength)}catch(_){self.response=u}
+          }
+          self.total=1;self.loaded=1;
+          self._fire('progress');
+          self._fire('readystatechange');
+          self._fire('load');
+        },0);
+        return;
+      }
+      dbg('XHR remoto: '+url);
+      try{
+        const real=new OrigXHR();
+        self._real=real;
+        real.open(self._method||'GET',url,true);
+        if(self.responseType){try{real.responseType=self.responseType}catch(_){}}
+        real.onreadystatechange=function(){
+          self.readyState=real.readyState;self.status=real.status;self.statusText=real.statusText;
+          if(real.readyState===4){self.response=real.response;self.responseText=real.responseText;self._done=true}
+          self._fire('readystatechange');
+        };
+        real.onerror=function(){self._fire('error')};
+        real.onabort=function(){self._fire('abort')};
+        real.onprogress=function(e){self.total=e.total;self.loaded=e.loaded;self._fire('progress')};
+        real.send(null);
+      }catch(e){dbg('XHR remoto falhou: '+((e&&e.message)||String(e)));self._fire('error')}
+    };
+    return Fake;
+  })();
+}
+
+const OrigWorker=window.Worker;
+if(__L.embedded&&typeof OrigWorker==='function'&&__L.wdosboxJs){
+  window.Worker=function(url,opts){
+    const u=String(url||'');
+    if(/wdosbox\\.js(?:[?#].*)?$/i.test(u)){
+      dbg('Worker local: wdosbox.js via Blob');
+      try{
+        const blob=new Blob([__L.wdosboxJs],{type:'text/javascript'});
+        const w=new OrigWorker(URL.createObjectURL(blob),opts);
+        w.addEventListener('error',function(e){dbg('WORKER: '+((e&&e.message)||'erro'))});
+        return w;
+      }catch(e){dbg('Worker blob FALHOU: '+((e&&e.message)||String(e)))}
+    }
+    dbg('Worker remoto: '+u);
+    return new OrigWorker(url,opts);
+  };
+  window.Worker.prototype=OrigWorker.prototype;
+}
+
+const OrigFetch=window.fetch;
+if(__L.embedded&&typeof OrigFetch==='function'){
+  window.fetch=function(u){dbg('fetch: '+String(u));return OrigFetch.apply(window,arguments)};
+}
+
 let finished=false;
 function startDoom(){
   setStatus('Iniciando DOOM...','');
-  if(typeof Dos==='undefined'){setStatus('js-dos nao carregou','error');return}
+  if(typeof Dos==='undefined'){setStatus('js-dos nao carregou','error');dbg('ERRO: global Dos ausente - js-dos.js nao executou?');return}
   try{
     window.emulators=window.emulators||{};
     window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';
+    dbg('Etapa 1: js-dos carregado; pathPrefix='+window.emulators.pathPrefix);
+    dbg('Etapa 2: '+(__L.wasmBytes?'wdosbox.js/.wasm LOCAIS':'wdosbox via rede')+' ; bundle '+(__L.bundleBytes?'LOCAL':'remoto')+': '+__L.bundleUrl);
     setStatus('Baixando o jogo...','');
-    const watchdog=setTimeout(()=>{if(!finished){finished=true;setStatus('Timeout ao baixar (rede?)','error')}},60000);
-    Dos(dosbox).run('${bundle}').then(function(){if(!finished){finished=true;clearTimeout(watchdog);setStatus('DOOM pronto','ready')}}).catch(function(e){if(!finished){finished=true;clearTimeout(watchdog);setStatus('Erro ao carregar DOOM','error')}});
-  }catch(e){setStatus('Erro: '+e.message,'error')}
+    const t0=Date.now();
+    const watchdog=setTimeout(function(){
+      if(!finished){finished=true;clearTimeout(watchdog);setStatus('Timeout '+Math.round((Date.now()-t0)/1000)+'s (rede/wasm?)','error');dbg('TIMEOUT em '+((Date.now()-t0)/1000).toFixed(1)+'s - demorou mais de 60s')}
+    },60000);
+    dbg('Etapa 3: Dos(dosbox,{emulatorFunction:'+emuFn+'}).run('+__L.bundleUrl+')');
+    Dos(dosbox,{emulatorFunction:emuFn}).run(__L.bundleUrl).then(function(){
+      if(!finished){finished=true;clearTimeout(watchdog);setStatus('DOOM pronto','ready');dbg('DOOM inicializado em '+((Date.now()-t0)/1000).toFixed(1)+'s')}
+    }).catch(function(e){
+      if(!finished){finished=true;clearTimeout(watchdog)}
+      const msg=(e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e));
+      setStatus('Erro: '+msg,'error');
+      dbg('FALHA em run(): '+msg);
+      if(e&&e.stack){try{dbg('stack: '+String(e.stack).split('\\n').slice(0,5).join(' ~ '))}catch(_){}}
+      if(/network|download|fetch|xhr/i.test(String(e&&e.message))){dbg('Dica: rede externa bloqueada? use embedBundle=true para embutir o bundle')}
+    });
+  }catch(e){setStatus('Erro: '+((e&&e.message)||String(e)),'error');dbg('Erro sincrono: '+((e&&e.message)||String(e)))}
 }
-if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()};`;
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()}`;
+}
+
+function buildDoomPlayerHtml(bundleUrl = '', opts) {
+  const options = opts || {};
+  const bundle = /^https:\/\/\S+\.jsdos(?:[?#].*)?$/.test(String(bundleUrl || '').trim()) ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
+  const bridge = buildDoomPlayerBridge(bundle, options);
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>${JSDOS_CSS}
-${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
+${buildDoomOrientationCss()}
+${buildDoomDiagnosticCss()}</style></head><body><main class="doom-app">
 <div class="doom-status" id="doomStatus" data-state="">Carregando DOOM...</div>
 <section class="stage" aria-label="Jogo"><div id="dosbox"></div></section>
 ${buildDoomPlayerControlsHtml()}
@@ -205,7 +408,7 @@ ${buildDoomPlayerControlsHtml()}
   <button type="button" class="sys" id="tab">TAB</button>
   <button type="button" class="sys" id="enter">ENTER</button>
 </div>
-<div class="doom-diag" id="doomDiag"></div>
+<div class="doom-diagnostics"><div class="doom-diag" id="doomDiag"></div><div class="doom-dbg" id="doomDbg"></div></div>
 </main><script>${JSDOS_JS}
 </script>
 <script>${buildDoomOrientationScript()}</script>
@@ -232,8 +435,8 @@ function sendDoomInputTest(sock, jid) {
   return sendDoomRichHtml(sock, jid, 'DOOM Input Test', buildDoomTestHtml());
 }
 
-function sendDoomExperimental(sock, jid, bundleUrl = '') {
-  return sendDoomRichHtml(sock, jid, 'DOOM', buildDoomPlayerHtml(bundleUrl));
+function sendDoomExperimental(sock, jid, bundleUrl = '', opts) {
+  return sendDoomRichHtml(sock, jid, 'DOOM', buildDoomPlayerHtml(bundleUrl, opts));
 }
 
 export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };

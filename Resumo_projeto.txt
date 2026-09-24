@@ -754,3 +754,40 @@ Verificacoes:
 - `git diff --check` limpo; bundle `doom.jsdos` nao versionado (assets/ ignorado).
 - Limite tecnico remanescente: execucao real do js-dos/DOOM no WebView so pode ser validada com o bot autenticado; a validacao atual e estatica/estrutural.
 - Commit + push realizados para `main` ao final da tarefa.
+
+Data: 2026-09-24
+Objetivo:
+- Corrigir a falha de runtime do js-dos 7.5.0 no player DOOM (/doon) dentro do WebView AIRich do WhatsApp Android: apos o fix de layout (commit 550eff0), o layout ficou correto, mas o emulador exibia "UNEXPECTED ERROR" + notyf "Can't start emulator look browser logs for more info". Sem mexer no layout, investigar a inicializacao do js-dos, adicionar diagnostico visivel (etapa atual, URL/recurso, error.message/name/stack, resultado de fetch e de WebAssembly) e eliminar dependencias externas remanescentes de forma segura seguindo o padrao GBA (100% inline, sem rede), depois testar, commitar, pushar na main e reportar causa, arquivos, testes e hash.
+
+Arquivos modificados:
+- dados/src/funcs/private/doomRichHtml.js (runtime do player reescrito: wdosbox.js/.wasm embutidos + interceptacao local de XHR/Worker + fallback sem Worker + diagnostico visivel + opcao de bundle embutido)
+- Resumo_projeto.txt (esta entrada)
+
+Arquivos criados:
+- dados/src/funcs/private/doom/vendor/jsdos/wdosbox.js (glue do runtime retirei das dependencias de rede) e wdosbox.wasm (1.462.485 bytes), ambos dist js-dos@7.5.0, embutidos inline no HTML (base64) a la GBA
+
+Alteracoes realizadas:
+- Causa real (confirmada por leitura do bundle js-dos 7.5.0): a mensagem "Can't start emulator..." e o overlay "UNEXPECTED ERROR" sao emitidos pelo `DosInstance.run()` sempre que `runBundle()` rejeita; o runtime nao e auto-suficiente — ele busca por XMLHttpRequest `wdosbox.js` + `wdosbox.wasm` (via `httpRequest`) e o bundle `doom.jsdos` (via `resolveBundle`), e ainda cria `new Worker(url)` cross-origin. No WebView AIRich (que ja roda o GBA 100% local) qualquer bloqueio de XHR/fetch, worker ou wasm produz exatamente essa falha imediata.
+- Mecanica verificada no bundle: `loadModule` faz `eval` do texto de wdosbox.js e compila o wasm no main thread, e o `wc-install` mandado ao worker transporta o `WebAssembly.Module` compilado (o glue do worker usa `instantiateWasm` proprio e nao baixa wasm); portanto basta embutir os dois arquivos e interceptar XHR + `new Worker` no main thread para o runtime ficar 100% local.
+- Novo bridge: define `window.__doomLocal` com wdosbox.js (texto) + wdosbox.wasm (base64 -> Uint8Array) e, opcionalmente, o bundle base64; wrapper de `XMLHttpRequest` que serve localmente URLs terminando em `wdosbox.js`/`wdosbox.wasm`/`.jsdos` (respeitando `responseType` arraybuffer vs texto, readyState/status/load/progress) e delega para o XHR real toda URL desconhecida; wrapper de `Worker` troca `wdosbox.js` por Blob URL; wrapper de `fetch` loga sem quebrar.
+- Fallback de compatibilidade: probe de WebAssembly e probe de `Worker`; se Worker indisponivel, `Dos(dosbox,{emulatorFunction:'dosboxDirect'})` roda o emulador no main thread (sem Worker) usando os mesmos bytes locais.
+- Diagnostico visivel em nova area `#doomDbg` (mesma celula `diag`, unica mudanca de DOM/CSS; layout geral intacto): painel rolavel com log por etapa (pathPrefix, wdosbox local, bundle remoto/local, `Dos().run`, watchdog 60s), `window.onerror`/`unhandledrejection`, espelhamento de `console.error/warn`, probes WASM/Worker, e no catch de `run()` o error.name/message/stack reais no status + painel (nada escondido atras de "UNEXPECTED ERROR").
+- Bundle `doom.jsdos` continua remoto por padrao (payload 2,7 MB); nova opcao `buildDoomPlayerHtml(url, {embedBundle:true})` embute o bundle em base64 (payload 10,1 MB) e o interceptador serve o `.jsdos` localmente — para o caso de o log indicar rede externa bloqueada.
+- Preservados: layout (doomOrientation.js intocado), protocolo AIRich/sendAIRichHtml.js, index.js, `buildDoomTestHtml` (doontest), `DOOM_INPUTS`, `window.doomInputBridge`, exports e alias `buildDoomExperimentalHtml`.
+
+Bugs encontrados:
+- Falha "Can't start emulator.../UNEXPECTED ERROR" = rejeicao de `runBundle` (download do bundle ou iniciacao do emulador); no aparelho a rejeicao e imediata, coerente com bloqueio de rede/worker/wasm no WebView.
+- wdosbox.js/wasm e Worker continuavam dependentes de CDN mesmo com js-dos inline, quebrando o "sem rede" do padrao GBA.
+
+Bugs corrigidos:
+- Runtime agora 100% local para o motor (js-dos.js+css + wdosbox.js+wasm inline, XHR/Worker interceptados), eliminando 2 dependencias externas de CDN.
+- Emulador ganhou fallback `dosboxDirect` (sem Worker) e diagnostico visivel com o erro real; o bundle pode ser embutido via `embedBundle:true` se a rede externa estiver bloqueada.
+
+Verificacoes:
+- `node --check` exit 0 em `doomRichHtml.js`, `doom/doomOrientation.js` e `index.js`.
+- Probe estrutural (default e embedBundle): sem `<script src>`/`<link href>`/`<img src>` externos; 3 blocos `<script>` = 3 fechamentos; sintaxe de cada bloco via `new Function` (js-dos 559 KB, orientacao, input+bridge 2,1 MB e 9,5 MB); `__doomLocal`/`dosboxDirect`/`Dos(dosbox,{emulatorFunction})`/XHR local/`Worker local: wdosbox.js via Blob`/watchdog 60000 presentes; wdosbox.wasm base64 = 1.949.980 chars (== 1.462.485 bytes); bundle base64 = 7.386.388 chars (== 5.539.791 bytes) so com embedBundle; ids/layout mantidos.
+- Smoke em runtime (vm sandbox offline): bridge executa sem excecao; wasm decodifica para 1.462.485 bytes; WASM disponivel; sem Worker -> `emuFn=dosboxDirect` aplicado em `Dos()`; run() com bundleUrl correto; rejeicao mostra "FALHA em run(): Error: Network error, can't download <bundle>" + dica embedBundle no status/painel; sucesso -> "DOOM pronto"/"DOOM inicializado em 0.0s".
+- Teste de interceptacao XHR (simulando o consumidor js-dos): `wdosbox.js` servido local (status 200, texto == glue embutido 125.962 bytes); `wdosbox.wasm` servido local como ArrayBuffer de 1.462.485 bytes; bundle nao embutido passa para o XHR real; URL desconhecida passa para a rede; nenhum asset local toca rede.
+- `git diff --check` limpo; bundle `assets/doom.jsdos` nao versionado (check-ignore).
+- Tamanhos: HTML default 2.697.450 bytes; com embedBundle 10.083.836 bytes.
+- Limite remanescente: validacao on-device do WebView apenas com o bot autenticado; o painel `#doomDbg` dirá a etapa/lindo do erro real no proximo teste.
