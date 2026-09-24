@@ -1,8 +1,17 @@
+import { readFileSync } from 'fs';
 import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
 import { buildDoomOrientationCss, buildDoomOrientationScript } from './doom/doomOrientation.js';
 
-const DOOM_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js';
-const DOOM_CSS_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.css';
+const JSDOS_ROOT = new URL('./doom/vendor/jsdos/', import.meta.url);
+
+function readDoomAsset(relativePath) {
+  return readFileSync(new URL(relativePath, JSDOS_ROOT), 'utf8')
+    .replace(/<\/script/gi, '<\\/script');
+}
+
+const JSDOS_JS = readDoomAsset('js-dos.js');
+const JSDOS_CSS = readDoomAsset('js-dos.css');
+
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
 const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
 
@@ -167,20 +176,25 @@ function buildDoomPlayerHtml(bundleUrl = '') {
   const bridge = `
 const doomStatus=document.getElementById('doomStatus');
 const dosbox=document.getElementById('dosbox');
-function setStatus(t,s){doomStatus.textContent=t;if(s)doomStatus.setAttribute('data-state',s)}
+function setStatus(t,s){if(!doomStatus)return;doomStatus.textContent=t;doomStatus.setAttribute('data-state',s||'')}
 function sendKey(keyCode,down){const type=down?'keydown':'keyup';const ev=new KeyboardEvent(type,{keyCode:keyCode,which:keyCode,bubbles:true});Object.defineProperty(ev,'keyCode',{get:()=>keyCode});Object.defineProperty(ev,'which',{get:()=>keyCode});window.dispatchEvent(ev);document.dispatchEvent(ev)}
 window.doomInputBridge=function(info,pressed){sendKey(info.keyCode,pressed)};
+[['esc',27],['tab',9],['enter',13]].forEach(function(pair){const el=document.getElementById(pair[0]);if(!el)return;el.addEventListener('pointerdown',e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId)}catch{}sendKey(pair[1],true)});const up=e=>{e.preventDefault();sendKey(pair[1],false)};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('click',e=>{e.preventDefault();setTimeout(()=>sendKey(pair[1],false),80)})});
+let finished=false;
 function startDoom(){
-  setStatus('Carregando DOOM...','');
-  if(typeof Dos==='undefined'){setStatus('Erro ao carregar DOOM','error');return}
+  setStatus('Iniciando DOOM...','');
+  if(typeof Dos==='undefined'){setStatus('js-dos nao carregou','error');return}
   try{
     window.emulators=window.emulators||{};
     window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';
-    Dos(dosbox).run('${bundle}').then(function(){setStatus('DOOM carregado','ready')}).catch(function(e){setStatus('Erro ao carregar DOOM','error')});
-  }catch(e){setStatus('Erro ao carregar DOOM','error')}
+    setStatus('Baixando o jogo...','');
+    const watchdog=setTimeout(()=>{if(!finished){finished=true;setStatus('Timeout ao baixar (rede?)','error')}},60000);
+    Dos(dosbox).run('${bundle}').then(function(){if(!finished){finished=true;clearTimeout(watchdog);setStatus('DOOM pronto','ready')}}).catch(function(e){if(!finished){finished=true;clearTimeout(watchdog);setStatus('Erro ao carregar DOOM','error')}});
+  }catch(e){setStatus('Erro: '+e.message,'error')}
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()};`;
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><link rel="stylesheet" href="${DOOM_CSS_URL}"><style>${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>${JSDOS_CSS}
+${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
 <div class="doom-status" id="doomStatus" data-state="">Carregando DOOM...</div>
 <section class="stage" aria-label="Jogo"><div id="dosbox"></div></section>
 ${buildDoomPlayerControlsHtml()}
@@ -191,7 +205,9 @@ ${buildDoomPlayerControlsHtml()}
   <button type="button" class="sys" id="tab">TAB</button>
   <button type="button" class="sys" id="enter">ENTER</button>
 </div>
-</main><script src="${DOOM_SCRIPT_URL}"></script>
+<div class="doom-diag" id="doomDiag"></div>
+</main><script>${JSDOS_JS}
+</script>
 <script>${buildDoomOrientationScript()}</script>
 ${buildDoomInputScript(bridge)}</body></html>`;
 }
@@ -220,7 +236,7 @@ function sendDoomExperimental(sock, jid, bundleUrl = '') {
   return sendDoomRichHtml(sock, jid, 'DOOM', buildDoomPlayerHtml(bundleUrl));
 }
 
-export { DOOM_BUNDLE_URL, DOOM_CSS_URL, DOOM_INPUTS, DOOM_SCRIPT_URL, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
+export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
 
 const buildDoomExperimentalHtml = buildDoomPlayerHtml;
 export { buildDoomExperimentalHtml };

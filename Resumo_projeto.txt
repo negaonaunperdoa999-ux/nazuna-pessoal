@@ -722,3 +722,35 @@ Verificacoes:
 - AIRich: `buildAIRichMessageContent` gerou `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIaeacdsnwHtmlPrimitive` correto; unifiedResponse = 15.007 bytes; label da submensagem = "DOOM".
 - Limite tecnico remanescente: execucao real do js-dos/DOOM so pode ser validada com o bot autenticado no WhatsApp (WebView do celular); validacao atual e estatica.
 - Nenhum commit ou push foi realizado (conforme regra da tarefa).
+
+Data: 2026-09-24
+Objetivo:
+- Corrigir de forma definitiva o player DOOM (/doon) no WebView do WhatsApp (Android): apos o fix de responsividade (commit 893cc9d), continuava exibindo apenas um retangulo preto (stage) sem controles, em retrato e paisagem, e girar o aparelho nao alterava o layout. Rewrite completo com autonomia total, usando como referencia o player AIRich funcional do proprio projeto (GBA.js empacotado 100% local, "sem rede"), descobrir a causa real, reescrever HTML/CSS/JS e inicializacao do js-dos, validar com probes e, ao final, commitar e pushar na main reportando causa, arquivos, testes, resultado e hash do commit.
+
+Arquivos modificados:
+- dados/src/funcs/private/doomRichHtml.js (player reescrito: js-dos 7.5.0 INLINE + layout em fluxo estilo GBA)
+- dados/src/funcs/private/doom/doomOrientation.js (reescrito: fluxo normal de documento, sem viewport units, sem overflow:hidden no shell)
+- Resumo_projeto.txt (esta entrada)
+
+Arquivos criados:
+- dados/src/funcs/private/doom/vendor/jsdos/js-dos.js (dist js-dos@7.5.0, 559.961 bytes, embutido inline no HTML a la GBA) e js-dos.css (37.776 bytes); wdosbox.js/wasm permanecem remotos via `emulators.pathPrefix`.
+
+Alteracoes realizadas:
+- Causa real identificada: o shell usava `height:100%/100vh/100dvh` + `overflow:hidden` na .doom-app e decidia a orientacao por `matchMedia('(orientation)')`/`innerHeight`; no WebView do AIRich essas unidades/medidas nao refletem a area visivel da mensagem, o stage flexivel (1fr) preenchia tudo e as linhas de controles (auto) ficavam cortadas sem scroll. A referencia do projeto (GBA) usa fluxo de documento com `min-height` px, `aspect-ratio` e media query de orientacao, sem viewport units no container e sem overflow:hidden.
+- Removidas dependencias externas de `<script src>`/`<link>`: js-dos.js e js-dos.css agora sao INLINE no HTML (via `readDoomAsset` com escape de `</script`), restando apenas fetch de runtime: wdosbox.js+wdosbox.wasm via `emulators.pathPrefix` (CDN) e o bundle `doom.jsdos` por HTTPS.
+- Novo layout GBA-style: html/body com `min-height:100%` e `touch-action:pan-y`; `.doom-app` em fluxo (max-width 920px, min-height 560px, grid areas retrato "status status"/"stage stage"/"dpad actions"/"sys sys"/"diag diag"); `.stage` min-height 190px; `#dosbox` com `aspect-ratio:16/10`, `max-height:420px`, `min-height:200px` (sem unidades de viewport); paisagem via `@media (orientation:landscape)` E classe `html.doom-landscape` medida por `clientWidth/Height`, grade "dpad | stage | actions" com sys e diag.
+- Boot com status por etapas em #doomStatus (Iniciando DOOM... -> Baixando o jogo... -> DOOM pronto / Erro ao carregar DOOM / Timeout), watchdog de 60s para download travado, e diagnostico de viewport em #doomDiag (WxH + vv + rotulo paisagem/retrato).
+- Botões de sistema ESC/TAB/ENTER agora enviam tecla pela bridge (antes nao estavam ligados); preservados `buildDoomTestHtml` (doontest), `sendDoomExperimental`, `DOOM_INPUTS` (19 entradas), `window.doomInputBridge` e o alias `buildDoomExperimentalHtml`.
+- Removidos os exports `DOOM_SCRIPT_URL` e `DOOM_CSS_URL` (nenhum uso fora do arquivo; o HTML nao tem mais `<link>`/`<script src>` externos).
+
+Bugs encontrados/corrigidos:
+- Retangulo preto sem controles: stage flexivel ocupando a area via medidas de viewport erradas + overflow:hidden cortando as linhas auto; corrigido com layout em fluxo (resultado sempre visivel/rolavel) e sem viewport units no container.
+- Medidas de orientacao nao confiaveis no WebView: corrigido com media query CSS + medicao real via `clientWidth/Height` (classe `doom-landscape`) e rotulo de diagnostico.
+- ESC/TAB/ENTER do player sem efeito: corrigido ligando os ids a `sendKey`.
+
+Verificacoes:
+- `node --check` passou em `doomRichHtml.js`, `doom/doomOrientation.js` e `index.js` (exit 0).
+- Probe estrutural temporario: 22/22 checagens OK — sem `<script src>`/`<link>` externos; js-dos inline com `window.Dos`; `pathPrefix` CDN; `Dos(dosbox).run(DOOM_BUNDLE_URL)`; status em etapas; watchdog 60s; ids esc/tab/enter; dpad 4 direcoes; 16+ `data-input`; shell `html,body` sem `height:100%` e sem overflow:hidden; `.doom-app` sem vh; `aspect-ratio:16/10`; grid areas retrato+paisagem; orientacao escreve diag; `doontest` intacto; payload AIRich `GenAIaeacdsnwHtmlPrimitive` com payload = 610.965 bytes (< 900 KB). Tag HTML balanceada (3 `<script>` = 3 `</script>`).
+- `git diff --check` limpo; bundle `doom.jsdos` nao versionado (assets/ ignorado).
+- Limite tecnico remanescente: execucao real do js-dos/DOOM no WebView so pode ser validada com o bot autenticado; a validacao atual e estatica/estrutural.
+- Commit + push realizados para `main` ao final da tarefa.
