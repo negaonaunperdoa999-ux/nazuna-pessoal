@@ -1,8 +1,10 @@
 import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
+import { buildDoomOrientationCss, buildDoomOrientationScript } from './doom/doomOrientation.js';
 
 const DOOM_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js';
 const DOOM_CSS_URL = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.css';
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
+const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
 
 const DOOM_INPUTS = [
   ['up', 'UP', 'ArrowUp', 38],
@@ -113,7 +115,7 @@ const countEl=document.getElementById('eventCount');
 const stateEl=document.getElementById('stateView');
 const fsBtn=document.getElementById('fullscreenBtn');
 const landBtn=document.getElementById('landscapeBtn');
-function updateReadout(){lastEl.textContent=lastEvent;countEl.textContent=String(eventCount);stateEl.textContent=Object.keys(inputState).filter(k=>inputState[k]).join(', ')||'none'}
+function updateReadout(){if(lastEl)lastEl.textContent=lastEvent;if(countEl)countEl.textContent=String(eventCount);if(stateEl)stateEl.textContent=Object.keys(inputState).filter(k=>inputState[k]).join(', ')||'none'}
 function emitInput(key,pressed,source){if(!inputMap[key])return;inputState[key]=pressed;eventCount+=1;lastEvent=inputMap[key].label+' '+(pressed?'DOWN':'UP')+' ('+source+')';const btn=document.querySelector('[data-input="'+key+'"]');if(btn)btn.classList.toggle('pressed',pressed);if(window.doomInputBridge)window.doomInputBridge(inputMap[key],pressed,inputState);updateReadout()}
 function bindButton(btn){const key=btn.getAttribute('data-input');if(!key)return;btn.addEventListener('pointerdown',e=>{e.preventDefault();try{btn.setPointerCapture(e.pointerId)}catch{}emitInput(key,true,'pointerdown')});['pointerup','pointercancel','pointerleave'].forEach(n=>btn.addEventListener(n,e=>{e.preventDefault();emitInput(key,false,n)}));btn.addEventListener('touchstart',e=>{e.preventDefault();emitInput(key,true,'touchstart')},{passive:false});btn.addEventListener('touchend',e=>{e.preventDefault();emitInput(key,false,'touchend')},{passive:false});btn.addEventListener('click',e=>{e.preventDefault();if(!inputState[key]){emitInput(key,true,'click');setTimeout(()=>emitInput(key,false,'click'),80)}})}
 document.querySelectorAll('[data-input]').forEach(bindButton);
@@ -121,10 +123,10 @@ window.addEventListener('keydown',e=>{const key=codeToKey[e.code];if(key&&!input
 window.addEventListener('keyup',e=>{const key=codeToKey[e.code];if(key){e.preventDefault();emitInput(key,false,'keyUp')}},true);
 function refreshLayout(){root.classList.toggle('landscape',window.matchMedia&&window.matchMedia('(orientation: landscape)').matches)}
 window.addEventListener('resize',refreshLayout);window.addEventListener('orientationchange',refreshLayout);refreshLayout();
-function setExpanded(on){root.classList.toggle('expanded',on);fsBtn.textContent=on?'SAIR DA TELA CHEIA':'TELA CHEIA'}
-fsBtn.addEventListener('click',async()=>{try{if(document.fullscreenEnabled){if(!document.fullscreenElement){await document.documentElement.requestFullscreen();setExpanded(true)}else{await document.exitFullscreen();setExpanded(false)}}else{setExpanded(!root.classList.contains('expanded'))}}catch{setExpanded(!root.classList.contains('expanded'))}});
-document.addEventListener('fullscreenchange',()=>setExpanded(!!document.fullscreenElement));
-landBtn.addEventListener('click',async()=>{try{if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape')}catch{}refreshLayout();});
+function setExpanded(on){root.classList.toggle('expanded',on);if(fsBtn)fsBtn.textContent=on?'SAIR DA TELA CHEIA':'TELA CHEIA'}
+if(fsBtn)fsBtn.addEventListener('click',async()=>{try{if(document.fullscreenEnabled){if(!document.fullscreenElement){await document.documentElement.requestFullscreen();setExpanded(true)}else{await document.exitFullscreen();setExpanded(false)}}else{setExpanded(!root.classList.contains('expanded'))}}catch{setExpanded(!root.classList.contains('expanded'))}});
+if(fsBtn)document.addEventListener('fullscreenchange',()=>setExpanded(!!document.fullscreenElement));
+if(landBtn)landBtn.addEventListener('click',async()=>{try{if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape')}catch{}refreshLayout();});
 ${engineBridge}
 updateReadout();
 }());
@@ -135,25 +137,71 @@ function buildDoomTestHtml() {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${buildDoomControlStyles()}</style></head><body><main class="app"><h2>DOOM Input Test</h2><section class="stage"><canvas id="screen" width="320" height="200"></canvas></section><section class="readout"><span>Ultimo evento: <b id="lastEvent">none</b></span><span>Eventos recebidos: <b id="eventCount">0</b></span><span>Pressionados: <b id="stateView">none</b></span><span>Orientacao: responsiva</span></section>${buildDoomControlsHtml()}</main>${buildDoomInputScript("const c=document.getElementById('screen'),x=c.getContext('2d');window.doomInputBridge=function(info,pressed,state){x.fillStyle='#071018';x.fillRect(0,0,c.width,c.height);x.fillStyle=pressed?'#f05a28':'#ffcb05';x.fillRect(36,36,248,96);x.fillStyle='#101820';x.font='22px Arial';x.textAlign='center';x.fillText(info.label+' '+(pressed?'DOWN':'UP'),160,92);};window.doomInputBridge({label:'READY'},false,inputState);")}</body></html>`;
 }
 
+function buildDoomPlayerControlsHtml() {
+  const button = (key, label, cls = '') => `<button type="button" class="${cls}" data-input="${key}" aria-label="${label}">${label}</button>`;
+  return `<div class="dpad" aria-label="Direcional">
+  <div class="pad-center" aria-hidden="true"></div>
+  ${button('up', '↑')}
+  ${button('left', '←')}
+  ${button('down', '↓')}
+  ${button('right', '→')}
+</div>
+<div class="actions" aria-label="Acoes">
+  ${button('strafeLeft', '◀')}
+  ${button('weapon1', '1')}
+  ${button('weapon2', '2')}
+  ${button('weapon3', '3')}
+  ${button('weapon4', '4')}
+  ${button('weapon5', '5')}
+  ${button('strafeRight', '▶')}
+  ${button('weapon6', '6')}
+  ${button('weapon7', '7')}
+  ${button('use', 'USE')}
+  ${button('fire', 'FIRE')}
+  ${button('run', 'RUN')}
+</div>`;
+}
+
+function buildDoomPlayerHtml(bundleUrl = '') {
+  const bundle = /^https:\/\/\S+\.jsdos(?:[?#].*)?$/.test(String(bundleUrl || '').trim()) ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
+  const bridge = `
+const doomStatus=document.getElementById('doomStatus');
+const dosbox=document.getElementById('dosbox');
+function setStatus(t,s){doomStatus.textContent=t;if(s)doomStatus.setAttribute('data-state',s)}
+function sendKey(keyCode,down){const type=down?'keydown':'keyup';const ev=new KeyboardEvent(type,{keyCode:keyCode,which:keyCode,bubbles:true});Object.defineProperty(ev,'keyCode',{get:()=>keyCode});Object.defineProperty(ev,'which',{get:()=>keyCode});window.dispatchEvent(ev);document.dispatchEvent(ev)}
+window.doomInputBridge=function(info,pressed){sendKey(info.keyCode,pressed)};
+function startDoom(){
+  setStatus('Carregando DOOM...','');
+  if(typeof Dos==='undefined'){setStatus('Erro ao carregar DOOM','error');return}
+  try{
+    window.emulators=window.emulators||{};
+    window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';
+    Dos(dosbox).run('${bundle}').then(function(){setStatus('DOOM carregado','ready')}).catch(function(e){setStatus('Erro ao carregar DOOM','error')});
+  }catch(e){setStatus('Erro ao carregar DOOM','error')}
+}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()};`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="${DOOM_CSS_URL}"><style>${buildDoomOrientationCss()}</style></head><body><main class="doom-app">
+<div class="doom-status" id="doomStatus" data-state="">Carregando DOOM...</div>
+<section class="stage" aria-label="Jogo"><div id="dosbox"></div></section>
+${buildDoomPlayerControlsHtml()}
+<div class="system">
+  <button type="button" class="sys" id="fullscreenBtn">TELA CHEIA</button>
+  <button type="button" class="sys" id="landscapeBtn">PAISAGEM</button>
+  <button type="button" class="sys" id="esc">ESC</button>
+  <button type="button" class="sys" id="tab">TAB</button>
+  <button type="button" class="sys" id="enter">ENTER</button>
+</div>
+</main><script src="${DOOM_SCRIPT_URL}"></script>
+<script>${buildDoomOrientationScript()}</script>
+${buildDoomInputScript(bridge)}</body></html>`;
+}
+
 function normalizeDoomBundleUrl(bundleUrl = '') {
   const trimmed = String(bundleUrl || '').trim();
   if (!trimmed) return '';
   if (!/^https:\/\//i.test(trimmed)) return '';
   if (!/\.jsdos(?:[?#].*)?$/i.test(trimmed) && !/\.zip(?:[?#].*)?$/i.test(trimmed)) return '';
   return trimmed;
-}
-
-function buildDoomExperimentalHtml(bundleUrl = '') {
-  const safeBundleUrl = normalizeDoomBundleUrl(bundleUrl);
-  const bridge = `
-const status=document.getElementById('doomStatus');
-const start=document.getElementById('startDoom');
-const urlInput=document.getElementById('bundleUrl');
-function setStatus(t){status.textContent=t}
-function sendKey(keyCode,down){const type=down?'keydown':'keyup';const ev=new KeyboardEvent(type,{keyCode:keyCode,which:keyCode,bubbles:true});Object.defineProperty(ev,'keyCode',{get:()=>keyCode});Object.defineProperty(ev,'which',{get:()=>keyCode});window.dispatchEvent(ev);document.dispatchEvent(ev)}
-window.doomInputBridge=function(info,pressed){sendKey(info.keyCode,pressed)};
-start.addEventListener('click',function(){const bundle=(urlInput.value||'').trim();if(!/^https:\\/\\//i.test(bundle)){setStatus('Informe uma URL HTTPS de bundle .jsdos/.zip livre, ex: Freedoom empacotado para js-dos.');return}setStatus('Carregando js-dos e bundle DOOM...');if(typeof Dos==='undefined'){setStatus('js-dos nao carregou. WebView bloqueou script remoto ou rede.');return}try{window.emulators=window.emulators||{};window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';Dos(document.getElementById('dosbox')).run(bundle).then(function(){setStatus('Bundle iniciado. Teste movimento/FIRE/USE.')}).catch(function(e){setStatus('Falha no bundle: '+(e&&e.message?e.message:e))})}catch(e){setStatus('Falha ao iniciar DOOM: '+e.message)}});`;
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${DOOM_CSS_URL}"><style>${buildDoomControlStyles('.start{display:grid;grid-template-columns:1fr;gap:6px}.status{font-size:12px;color:#c5d7df;text-align:center}input{width:100%;min-height:36px;border:1px solid #4c6a7a;border-radius:6px;background:#081118;color:#fff;padding:0 8px;font-size:12px}')}</style></head><body><main class="app"><h2>DOOM AIRich Experimental</h2><section class="stage"><div id="dosbox"></div></section><div class="start"><input id="bundleUrl" type="url" value="${safeBundleUrl}" placeholder="https://.../freedoom.jsdos"><button type="button" id="startDoom">INICIAR DOOM</button><div class="status" id="doomStatus">Loader pronto. Forneca um bundle livre .jsdos/.zip por HTTPS; nenhuma IWAD proprietaria foi embutida.</div></div><section class="readout"><span>Ultimo evento: <b id="lastEvent">none</b></span><span>Eventos recebidos: <b id="eventCount">0</b></span><span>Pressionados: <b id="stateView">none</b></span><span>WASM/rede: carregamento remoto</span></section>${buildDoomControlsHtml()}</main><script src="${DOOM_SCRIPT_URL}"></script>${buildDoomInputScript(bridge)}</body></html>`;
 }
 
 async function sendDoomRichHtml(sock, jid, label, html) {
@@ -169,7 +217,10 @@ function sendDoomInputTest(sock, jid) {
 }
 
 function sendDoomExperimental(sock, jid, bundleUrl = '') {
-  return sendDoomRichHtml(sock, jid, 'DOOM Experimental', buildDoomExperimentalHtml(bundleUrl));
+  return sendDoomRichHtml(sock, jid, 'DOOM', buildDoomPlayerHtml(bundleUrl));
 }
 
-export { DOOM_CSS_URL, DOOM_INPUTS, DOOM_SCRIPT_URL, DOOM_WASM_PREFIX, buildDoomExperimentalHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
+export { DOOM_BUNDLE_URL, DOOM_CSS_URL, DOOM_INPUTS, DOOM_SCRIPT_URL, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
+
+const buildDoomExperimentalHtml = buildDoomPlayerHtml;
+export { buildDoomExperimentalHtml };

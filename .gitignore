@@ -26,3 +26,6 @@ dados/midias/temp_*/
 
 # Material potencialmente proprietário (BIOS GBA)
 dados/src/funcs/private/gba/vendor/gbajs/resources/bios.bin
+
+# Bundle DOOM (.jsdos contem IWAD/EXE proprietarios; carregado por HTTPS no WebView)
+dados/src/funcs/private/doom/assets/

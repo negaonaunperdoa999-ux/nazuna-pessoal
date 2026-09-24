@@ -680,3 +680,45 @@ Verificacoes:
 - `npm install-scripts ls` final: "No packages with unreviewed install scripts" (exit 0).
 - `git status --short`: apenas `M package-lock.json` (somente CRLF; conteudo normalizado identico ao HEAD) e `M package.json` (bloco `allowScripts` adicionado pelo comando npm).
 - Nenhum commit ou push foi realizado.
+
+Data: 2026-09-24
+Objetivo:
+- Implementar a proxima etapa do DOOM no Nazuna: transformar o `/doon` (prova de conceito) em um player de DOOM funcional no WhatsApp, com bundle real carregado automaticamente por HTTPS, interface mobile com D-pad a esquerda, jogo centralizado, acoes a direita, layout responsivo e troca dinamica de orientacao (paisagem/retrato). Sem modificar AIRich/protocolo, sem commit e sem push.
+
+Arquivos modificados:
+- dados/src/funcs/private/doomRichHtml.js (reescrito o builder do player; `buildDoomTestHtml` preservado)
+- .gitignore (adicionado `dados/src/funcs/private/doom/assets/`; bundle nao versionado)
+- Resumo_projeto.txt (esta entrada)
+
+Arquivos criados:
+- dados/src/funcs/private/doom/doomOrientation.js (modulo isolado de CSS JS responsividade/orientacao: `buildDoomOrientationCss`, `buildDoomOrientationScript`)
+- dados/src/funcs/private/doom/assets/doom.jsdos (bundle DOOM real baixado de `https://cdn.dos.zone/custom/dos/doom.jsdos`, 5.539.791 bytes, ZIP integro com DOOM.EXE/DOOM.WAD/dosbox.conf; NAO versionado)
+
+Alteracoes realizadas:
+- Confirmado que o HTML roda no WebView do WhatsApp (celular), nao acessa disco local do bot: o player agora carrega o bundle por URL HTTPS fixa (`DOOM_BUNDLE_URL`) sem campo de URL manual nem botao INICIAR.
+- Criado `doomOrientation.js` com CSS responsivo usando `100dvh`/`100dvw`, safe-area e troca dinamica: paisagem = D-pad (esquerda) | stage | acoes (direita); retrato = stage no topo + controles embaixo (D-pad + acoes lado a lado); listeners de `orientationchange`/`resize`/`visualViewport`.
+- Novo `buildDoomPlayerHtml(bundleUrl='')`: auto-load js-dos 7.5.0 (CDN jsdelivr), `Dos(dosbox).run(DOOM_BUNDLE_URL)`, D-pad (cima/esquerda/baixo/direita + centro) a esquerda, acoes a direita (STRAFE esq/dir, armas 1-7, USE, FIRE, RUN) em grid de 3 colunas, e botoes de sistema (TELA CHEIA, PAISAGEM, ESC, TAB, ENTER); status visivel em 3 estados (Carregando DOOM... / DOOM carregado / Erro ao carregar DOOM).
+- Preservados: `buildDoomTestHtml` (doontest), `sendDoomExperimental(sock, jid, bundleUrl='')`, `DOOM_INPUTS` (19 entradas) e interface com `window.doomInputBridge`.
+- Mantido o alias `buildDoomExperimentalHtml = buildDoomPlayerHtml` para compatibilidade de API/documentacao.
+- Decisao de versionamento: bundle `.jsdos` NÃO versionado (5,5 MB de conteudo proprietario DOOM.WAD/DOOM.EXE; HTML ja o carrega por HTTPS), coerente com o `*.zip` ja ignorado.
+
+Codigos escritos ou modificados:
+- `dados/src/funcs/private/doomRichHtml.js` (player novo; `\s` de log de estatistica mantido inalterado)
+- `dados/src/funcs/private/doom/doomOrientation.js` (novo, isolado do protocolo)
+- `.gitignore` (ignore do diretorio de assets do DOOM)
+
+Bugs encontrados:
+- Erro de sintaxe `Unexpected token ':'` no primeiro export (alias inline `buildDoomExperimentalHtml: buildDoomPlayerHtml` invalido na lista); corrigido separando a exportacao do alias.
+- Probes de teste escritos pelo tooling sofreram corrupcao de escaping (regex `run(bundle)` / flags invalidas); reconstruidos com `includes()` simples.
+
+Bugs corrigidos:
+- `doomOrientation.js` e `doomRichHtml.js` agora passam em `node --check` (exit 0).
+
+Verificacoes:
+- `node --check` passou em `dados/src/funcs/private/doomRichHtml.js` e `dados/src/funcs/private/doom/doomOrientation.js` (exit 0).
+- `git diff --check` limpo (exit 0). `git status --short`: `M .gitignore`, `M dados/src/funcs/private/doomRichHtml.js`, `?? dados/src/funcs/private/doom/doomOrientation.js`; bundle esteja ignorado (`git check-ignore` exit 0).
+- `git diff --stat`: .gitignore +3, doomRichHtml.js +75/-21; `sendAIRichHtml.js` e `index.js` sem alteracoes.
+- HTML gerado (14.012 bytes): contem auto-load do `DOOM_BUNDLE_URL`, sem input/botao de URL manual, js-dos 7.5.0, `emulators.pathPrefix`, `Dos(dosbox).run`, D-pad completo, armas 1-7, ponta/centro, botoes sys, CSS+script de orientacao, status em 3 estados; `doontest` intacto (screen/lastEvent).
+- AIRich: `buildAIRichMessageContent` gerou `botForwardedMessage -> richResponseMessage -> unifiedResponse -> GenAIaeacdsnwHtmlPrimitive` correto; unifiedResponse = 15.007 bytes; label da submensagem = "DOOM".
+- Limite tecnico remanescente: execucao real do js-dos/DOOM so pode ser validada com o bot autenticado no WhatsApp (WebView do celular); validacao atual e estatica.
+- Nenhum commit ou push foi realizado (conforme regra da tarefa).
