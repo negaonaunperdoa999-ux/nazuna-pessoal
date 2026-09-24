@@ -610,3 +610,73 @@ Verificacoes:
 - Tamanhos aproximados: `/richtest` 2458 bytes HTML / 2792 bytes unifiedResponse; `/doontest` 9734 / 10601; `/doon` 11406 / 12302 com URL de exemplo; `/gbatest` 286794 / 316387.
 - Confirmado que os novos payloads nao usam envio de documento HTML.
 - Confirmado que `/richtest` continua usando o mesmo helper AIRich e uma unica chamada `relayMessage`.
+
+Data: 2026-09-24
+Objetivo:
+- Auditar o estado de runtime/dependencias do projeto e, em seguida, cancelar essa rodada revertendo as alteracoes nao commitadas.
+
+Arquivos modificados:
+- package.json (revertido a HEAD)
+- dados/src/connect.js (revertido a HEAD)
+- dados/src/index.js (revertido a HEAD)
+- dados/src/utils/database.js (revertido a HEAD)
+- dados/src/.scripts/start.js (revertido a HEAD)
+- Resumo_projeto.txt (esta entrada)
+
+Alteracoes realizadas:
+- Feita auditoria read-only de runtime/dependencias: o Node/npm nao estavam disponiveis no PATH do Windows; o unico Node disponivel era o portatil em Downloads.
+- Verificado que `npm`, `sharp` e `yt-search` nao estavam instalados (node_modules vazio) e que o package-lock nao estava sincronizado.
+- Antes de qualquer correcao, o usuario cancelou a rodada; revertidas todas as alteracoes nao commitadas com `git checkout HEAD --` para os cinco arquivos.
+- Ao final da reversao, o working tree ficou limpo (git status vazio), nenhum commit ou push foi feito.
+
+Codigos escritos ou modificados:
+- Nenhum codigo de aplicacao permaneceu alterado apos a reversao.
+
+Bugs encontrados:
+- O npm nao existia no ambiente; tentativas de usar node portatil falharam por falta de PATH para o postinstall do baileys na rodada anterior.
+- A sessao de boot do bot ainda dependia de dependencias ausentes, o que foi tratado na rodada seguinte.
+
+Bugs corrigidos:
+- Working tree restaurado exatamente ao estado do HEAD `e51bf90 refactor: finalize AIRich consolidation`.
+
+Verificacoes:
+- git status --short vazio apos a reversao.
+- Confirmado que nenhum arquivo AIRich ou sensivel foi alterado durante a auditoria.
+
+Data: 2026-09-24
+Objetivo:
+- Desbloquear o ambiente de execucao para testar o comando `/doom` (e `/doontest`) no WhatsApp, instalando dependencias e liberando os scripts de instalacao do runtime.
+
+Arquivos modificados:
+- package.json (adicionado automaticamente o bloco `allowScripts` pelo `npm install-scripts approve`)
+- package-lock.json (reescrito com CRLF pelo npm; conteudo normalizado identico ao HEAD)
+- Resumo_projeto.txt (esta entrada)
+
+Alteracoes realizadas:
+- Confirmado que `startup.js` na raiz e o inicializador real do bot: importa `dados/src/index.js` e `dados/src/connect.js`.
+- Confirmado que `/doom` e `/doontest` ja estavam registrados no dispatcher de `dados/src/index.js` (cases `doom` e `doontest`), sem necessidade de novo codigo de comando.
+- Localizado o Node.js portatil em `Downloads\node-portable\node-v26.10.0-win-x64` e executado `npm install --no-audit --no-fund --no-progress` na raiz do projeto: exit 0 com 207 pacotes instalados.
+- Executado `npm install-scripts ls`: 2 pacotes com scripts de instalacao pendentes (baileys preinstall engine-requirements e protobufjs postinstall).
+- Executado `npm install-scripts approve baileys protobufjs`: exit 0; a lista de pendentes ficou vazia.
+- Iniciado o bot com `node startup.js`: a sessao WhatsApp estava expirada (codigo 401), a pasta `dados/database/qr-code` foi removida e um novo QR Code foi gerado para autenticacao manual.
+
+Codigos escritos ou modificados:
+- Nenhum codigo de aplicacao foi alterado nesta etapa.
+
+Bugs encontrados:
+- A sessao WhatsApp anterior estava expirada (codigo 401), exigindo nova autenticacao via QR Code.
+- O npm 11 (node portatil v26.10.0) bloqueia por padrao os install-scripts de `baileys` e `protobufjs` ate serem aprovados explicitamente.
+- O comando `node` nao esta no PATH fixo do Windows; todos os comandos usaram o caminho absoluto do node portatil no processo.
+
+Bugs corrigidos:
+- Dependencias instaladas com sucesso (node_modules na raiz preenchido com 172 pastas; `baileys`, `undici`, `pino`, `libsignal` e `sharp` presentes).
+- Scripts de instalacao de `baileys` e `protobufjs` aprovados, desbloqueando o runtime.
+- O boot do bot passou a subir sem erro de dependencias (o bloqueio anterior foi removido).
+
+Verificacoes:
+- `node --version` = v26.10.0; `npm --version` = 11.19.1; `where node`/`where npm` apontam para a pasta portatil.
+- `node --check` passou em `startup.js`, `dados/src/index.js` e `dados/src/connect.js` (exit 0).
+- `node --check dados/src/funcs/private/doomRichHtml.js` passou (js-dos via CDN, sem dependencia local).
+- `npm install-scripts ls` final: "No packages with unreviewed install scripts" (exit 0).
+- `git status --short`: apenas `M package-lock.json` (somente CRLF; conteudo normalizado identico ao HEAD) e `M package.json` (bloco `allowScripts` adicionado pelo comando npm).
+- Nenhum commit ou push foi realizado.
