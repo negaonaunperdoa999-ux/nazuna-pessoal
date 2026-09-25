@@ -437,6 +437,58 @@ function probeOne(url){
     tryHead();
   });
 }
+function bundleIsoTest(){
+  var u=__L.bundleUrl;
+  var mark=u+(String(u).indexOf('?')>=0?'&':'?')+'doomiso=1';
+  dia('BUNDLE_FETCH_START','true');
+  dia('BUNDLE_FETCH_URL',u);
+  var res={};
+  function capfill(name,val){if(!res[name])res[name]=val}
+  function runFetch(name,mode,opt){
+    if(typeof window.fetch!=='function'){res[name]='no-fetch';return Promise.resolve()}
+    var ctrl=(typeof AbortController==='function')?new AbortController():null;
+    var t1=ctrl?setTimeout(function(){try{ctrl.abort()}catch(_){}capfill(name,'timeout')},8000):null;
+    try{
+      return window.fetch(mark,opt).then(function(r){
+        if(t1)clearTimeout(t1);
+        capfill(name,'status='+(r&&typeof r.status==='number'?r.status:'0')+' type='+(r&&r.type||''));
+      },function(e){
+        if(t1)clearTimeout(t1);
+        capfill(name,'FAIL '+(String((e&&e.message)||e))+(mode?' ['+mode+']':''));
+      });
+    }catch(e){capfill(name,'THROW '+String(e));return Promise.resolve()}
+  }
+  function runXhr(name){
+    if(typeof XMLHttpRequest==='undefined'){res[name]='no-xhr';return Promise.resolve()}
+    return new Promise(function(rs){
+      var x=new XMLHttpRequest(),sett=false;
+      try{
+        x.open('GET',mark,true);x.timeout=8000;
+        x.onreadystatechange=function(){if(x.readyState===4&&!sett){sett=true;res[name]='status='+x.status}};
+        x.onerror=function(){if(!sett){sett=true;res[name]='FAIL xhr network'}};
+        x.ontimeout=function(){if(!sett){sett=true;res[name]='timeout'}};
+        x.onabort=function(){if(!sett){sett=true;res[name]='abort'}};
+        x.send(null);
+      }catch(e){res[name]='THROW '+String(e)}
+    });
+  }
+  return Promise.resolve()
+    .then(function(){return runFetch('GET','cors',{method:'GET',cache:'no-store'})})
+    .then(function(){return runFetch('HEAD','cors',{method:'HEAD',cache:'no-store'})})
+    .then(function(){return runFetch('RANGE','cors',{method:'GET',cache:'no-store',headers:{Range:'bytes=0-0'}})})
+    .then(function(){return runFetch('NOCORS',null,{method:'GET',mode:'no-cors',cache:'no-store'})})
+    .then(function(){return runXhr('XHR')})
+    .then(function(){
+      var g=res.GET||'',x=res.XHR||'',h=res.HEAD||'',r=res.RANGE||'',n=res.NOCORS||'';
+      dia('BUNDLE_FETCH_METHOD','GET|XHR|HEAD|RANGE|NOCORS (amostra)');
+      dia('BUNDLE_FETCH_STATUS',g+' | '+x+' | '+h+' | '+r+' | '+n);
+      dia('BUNDLE_FETCH_RESPONSE','GET: '+g+' | NOCORS: '+n);
+      var errs=['FAIL','THROW','timeout','abort','no-fetch','no-xhr','no-xhr'];
+      var first='none';
+      ['GET','XHR','HEAD','RANGE','NOCORS'].forEach(function(k){if(res[k]&&errs.indexOf(res[k])>=0&&/FAIL|THROW/.test(res[k])){if(first==='none')first=res[k]}});
+      dia('BUNDLE_FETCH_ERROR',first);
+    });
+}
 function probeDelivery(url){
   return new Promise(function(resolve){
     if(typeof window.fetch!=='function'){resolve({net:'indeterm',err:'no fetch'})}
@@ -680,7 +732,7 @@ function startDoom(){
 }
 function bootDoom(){
   const t0=Date.now();
-  var pollN=0,wdOK=0,__canvasSeenAt=0,__frameIdx=0,__frameRun=0,__fbReady=0;
+  var pollN=0,wdOK=0,__canvasSeenAt=0,__frameIdx=0,__frameRun=0,__fbReady=0,__bwK=0,__bwE=0;
   const __frameTimes=[3,7,12];
   function checkFrames(cv){
     try{
@@ -717,9 +769,11 @@ function bootDoom(){
     var lm=document.querySelector('.emulator-js-loading-message, .loading-message, .jsdos-loading, .loading-label');
     if(lm&&lm.textContent){var tt=String(lm.textContent).trim();if(tt&&tt!==__lastMsg){__lastMsg=tt;dbg('js-dos msg: '+tt)}}
     if(__workerStart&&!__workerErr){
+      if(!__bwK){__bwK=1;dia('BUNDLE_WORKER_STATUS','worker criado + vivo sem erro')}
       if(Date.now()-__workerStart>1000&&!__sawWasmReq){__sawWasmReq=true;mrk('WASM_REQUEST');dbg('WASM_REQUEST (inferido: dentro do Worker, nao visivel da thread principal)')}
       if(Date.now()-__workerStart>5000&&!__sawWasmOk){__sawWasmOk=true;mrk('WASM_OK');dbg('WASM_OK (inferido: Worker vivo 5s sem erro de rede)')}
     }
+    if(__workerErr&&!__bwE){__bwE=1;dia('BUNDLE_WORKER_ERROR','true (worker reportou erro)')}
     var cv=document.querySelector('#dosbox canvas');
     if(cv){
       if(!__canvasSeen){__canvasSeen=true;__canvasSeenAt=Date.now();mrk('CANVAS_FOUND');mrk('CANVAS_READY');dia('CANVAS_FOUND','true');dia('CANVAS_WIDTH',cv.width);dia('CANVAS_HEIGHT',cv.height);dbg('canvas em #dosbox: '+cv.width+'x'+cv.height);if(cv.width>0&&cv.height>0){mrk('CANVAS_SIZE');dbg('[DOOM-REMOTE] CANVAS_SIZE '+cv.width+'x'+cv.height)}else{dbg('[DOOM-REMOTE] CANVAS_SIZE_ZERO=true (bitmap '+cv.width+'x'+cv.height+')')}}
@@ -748,10 +802,12 @@ function bootDoom(){
   },8000);
   try{
     setStatus('Criando Dos()...','');
+    try{bundleIsoTest()}catch(_e){}
     dia('DOS_CREATED','true');
     mrk('DOS_CREATED');
     dia('GRAPHICS','2D_FORCED');
     const __di=Dos(dosbox,{emulatorFunction:emuFn,noWebGL:true});
+    dia('BUNDLE_WORKER_START','true (emulator='+emuFn+'; bundle baixado no main thread por resolveBundle XHR; worker recebe os bytes)');
     setStatus('Baixando o jogo...','');
     mrk('DOS_RUN');
     dia('DOS_RUN_STARTED','true');
