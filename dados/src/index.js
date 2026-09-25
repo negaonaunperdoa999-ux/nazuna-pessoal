@@ -2113,6 +2113,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     try { console.log(`[TEMP-DIAG C9] comando=${command} isCmd=${isCmd} prefix="${groupPrefix}" body="${body.trim().slice(0, 30)}"`); } catch (e) {}
 
     const isPremium = premiumListaZinha[sender] || premiumListaZinha[from] || isOwner;
+    try { console.log(`[TEMP-DIAG C11] pre-gates: isGroup=${isGroup} isOwner=${isOwner} isPremium=${isPremium} isOwnerOrSub=${isOwnerOrSub} isCmd=${isCmd} matAlias=${matchedAlias} from=${from?.slice(0, 15)}`); } catch (e) {}
 
     // Verificação de captcha para solicitações de entrada em grupos (DEVE vir ANTES de antipv)
     // Otimizado: usa índice de captcha em vez de varrer todos os arquivos
@@ -2207,6 +2208,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
 
 
 
+    try { console.log(`[TEMP-DIAG C12] apos captcha | command=${command}`); } catch (e) {}
     if (!isGroup) {
       // Exceção para comandos de transmissão que devem funcionar no PV
       const tm2Commands = ['inscrevertm', 'inscrevertm2', 'desinscrever', 'desinscrevertm', 'cancelartm'];
@@ -2231,6 +2233,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
         return;
       };
     };
+    try { console.log(`[TEMP-DIAG C13] apos antipv | command=${command}`); } catch (e) {}
     if (isGroup && banGpIds[from] && !isOwner && !isPremium) {
       return;
     };
@@ -2524,6 +2527,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       return;
     };
 
+    try { console.log(`[TEMP-DIAG C14] apos gates grupo adm/bloqueados | command=${command}`); } catch (e) {}
     if (isCmd && antiSpamGlobal?.enabled && !isOwnerOrSub) {
       try {
         const cfg = antiSpamGlobal;
@@ -2557,6 +2561,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
         console.error('Erro no AntiSpam Global:', e);
       }
     }
+    try { console.log(`[TEMP-DIAG C14b] apos antispam | command=${command}`); } catch (e) {}
     if (isGroup && groupData.afkUsers && groupData.afkUsers[sender]) {
       try {
         const afkReason = groupData.afkUsers[sender].reason;
@@ -4647,6 +4652,7 @@ const getFileBuffer = async (mediakey, mediaType, options = {}) => {
       console.log(`[TEMP-DIAG C9b] DESCARTADO: botState off (nao dono) cmd=${command}`);
       return;
     }
+    try { console.log(`[TEMP-DIAG C15] botState ok | command=${command}`); } catch (e) {}
     if (botState.viewMessages) nazu.readMessages([info.key]);
     try {
       if (budy2 && budy2.length > 1) {
@@ -4880,6 +4886,7 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
     if (isCmd && globalBlocks.commands && globalBlocks.commands[command]) {
       return reply(`🚫 O comando *${command}* está temporariamente desativado globalmente.\nMotivo: ${globalBlocks.commands[command].reason}`);
     }
+    try { console.log(`[TEMP-DIAG C16] apos blacklists/globalBlocks | cmdBloqGlobal=${(globalBlocks.commands && globalBlocks.commands[command]) ? 'BLOQUEADO-SIM' : 'ok'}`); } catch (e) {}
     if (isCmd && commandStats && commandStats.trackCommandUsage && command && command.length > 0) {
       commandStats.trackCommandUsage(command, sender);
     }
@@ -5413,12 +5420,14 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
       // Otimização: Normalização otimizada
       const normalizedTrigger = optimizer.normalizeCommand(command) || normalizar(command);
       // Otimização: Cache de comandos personalizados
+      try { console.log(`[TEMP-DIAG C17] antes customCmd | trigger=${normalizedTrigger}`); } catch (e) {}
       const customCmd = await optimizer.memoize(
         `customcmd:${from}:${normalizedTrigger}`,
         () => Promise.resolve(findCustomCommand(normalizedTrigger)),
         5000 // 5 segundos
       );
       if (customCmd) {
+        try { console.log(`[TEMP-DIAG C17b] CUSTOM COMMAND ENCONTRADA trigger=${normalizedTrigger}`); } catch (e) {}
         try {
           const responseData = customCmd.response;
           const settings = customCmd.settings || {};
@@ -5743,6 +5752,7 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
       }
     }
 
+    try { console.log(`[TEMP-DIAG C18] apos customCmds | command=${command}`); } catch (e) {}
     if (isCmd && !['cmdlimitar', 'cmdlimit', 'limitarcmd', 'cmddeslimitar', 'cmdremovelimit', 'rmcmdlimit', 'cmdlimites', 'cmdlimits', 'listcmdlimites'].includes(command)) {
       const globalLimitCheck = checkCommandLimit(command, sender);
       if (globalLimitCheck.limited) {
@@ -5751,6 +5761,7 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
     }
 
     // Verificação de comandos VIP
+    try { console.log(`[TEMP-DIAG C19] checagem VIP | command=${command} isVip=${vipCommandsManager.isVipCommand(command)}`); } catch (e) {}
     if (isCmd && vipCommandsManager.isVipCommand(command)) {
       if (!isPremium) {
         await reply(`🔒 *Comando VIP Exclusivo*
@@ -5773,6 +5784,7 @@ Entre em contato com o dono do bot:
     }
 
 
+    try { console.log(`[TEMP-DIAG C20] checagem subowner | command=${command}`); } catch (e) {}
     // ==================== VERIFICAÇÃO DE COMANDOS PARA SUBDONOS ====================
     if (isCmd && command && !isOwner) {
       try {
