@@ -21,17 +21,19 @@ function createId() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-function buildHtmlSection(html, trustedSources = []) {
-  return { __typename: 'GenAIUnifiedResponseSection', view_model: { __typename: 'GenAISingleLayoutViewModel', primitive: { __typename: HTML_PRIMITIVE, payload: html, trusted_sources: trustedSources } } };
+function buildHtmlSection(html, trustedSources = [], url = '') {
+  const primitive = { __typename: HTML_PRIMITIVE, payload: html, trusted_sources: trustedSources };
+  if (url) primitive.url = url;
+  return { __typename: 'GenAIUnifiedResponseSection', view_model: { __typename: 'GenAISingleLayoutViewModel', primitive } };
 }
 
-function buildUnifiedResponse(html, trustedSources = []) {
-  return { __typename: 'GenAIUnifiedResponse', response_id: createId(), sections: [buildHtmlSection(html, trustedSources)] };
+function buildUnifiedResponse(html, trustedSources = [], url = '') {
+  return { __typename: 'GenAIUnifiedResponse', response_id: createId(), sections: [buildHtmlSection(html, trustedSources, url)] };
 }
 
 function buildAIRichMessageContent(html, options = {}) {
-  const { label = 'Rich HTML Test', botJid = DEFAULT_BOT_JID, trustedSources = [] } = options;
-  const unifiedData = Buffer.from(JSON.stringify(buildUnifiedResponse(html, trustedSources)), 'utf-8');
+  const { label = 'Rich HTML Test', botJid = DEFAULT_BOT_JID, trustedSources = [], url = '' } = options;
+  const unifiedData = Buffer.from(JSON.stringify(buildUnifiedResponse(html, trustedSources, url)), 'utf-8');
   return { botForwardedMessage: { message: { richResponseMessage: { messageType: AI_RICH_RESPONSE_TYPE_STANDARD, submessages: label ? [{ messageType: 2, messageText: label }] : [], unifiedResponse: { data: unifiedData }, contextInfo: { mentionedJid: [], groupMentions: [], statusAttributions: [], forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid }, forwardOrigin: 4 } } } } };
 }
 
@@ -99,8 +101,8 @@ function logAirichBlocked(logLabel, check) {
 
 async function sendAIRichHtml(sock, jid, html, options = {}) {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
-  const { label = 'Rich HTML Test', trustedSources = [], botJid = DEFAULT_BOT_JID, messageId = createId(), logLabel = 'richtest' } = options;
-  const richContent = buildAIRichMessageContent(html, { label, trustedSources, botJid });
+  const { label = 'Rich HTML Test', trustedSources = [], botJid = DEFAULT_BOT_JID, messageId = createId(), logLabel = 'richtest', url = '' } = options;
+  const richContent = buildAIRichMessageContent(html, { label, trustedSources, botJid, url });
 
   const check = checkAirichPayloadWithinLimit(html, richContent);
   console.log(`[${logLabel}] htmlBytes=${check.metrics.htmlBytes}`);

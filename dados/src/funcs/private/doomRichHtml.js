@@ -41,6 +41,7 @@ const WDOSBOX_WASM_B64 = readDoomAssetB64('wdosbox.wasm');
 
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
 const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
+const DOOM_RUNTIME_URL = DOOM_WASM_PREFIX;
 const DOOM_TRUSTED_SOURCES = [
   'https://cdn.jsdelivr.net',
   'https://cdn.dos.zone'
@@ -240,6 +241,20 @@ var __netDedup={};
 function mrk(m){if(__netDedup['M:'+m])return;__netDedup['M:'+m]=1;dbg('[DOOM-REMOTE] '+m);try{console.log('[DOOM-REMOTE] '+m)}catch(_){}}
 function __netMark(kind,phase,extra){const k=kind+'|'+phase;if(__netDedup[k])return;__netDedup[k]=1;const l='[DOOM-REMOTE] '+kind+'_'+phase+(extra?' '+extra:'');dbg(l);try{console.log(l)}catch(_){}}
 mrk('HTML_LOADED');
+(function(){
+  var __href='';try{__href=String((typeof location!=='undefined'&&location.href)||'')}catch(_){}
+  var __origin='';try{__origin=String((typeof location!=='undefined'&&location.origin)||'')}catch(_){}
+  if(__href.length>150)__href=__href.slice(0,150)+'...';
+  dbg('[DOOM-REMOTE] WVIEW_ORIGIN '+(__origin||'(none)')+' | href='+__href);
+  if(__origin==='null')dbg('[DOOM-REMOTE] OPAQUE_ORIGIN=true');
+  var __vis='';try{__vis=String(document.visibilityState||'')}catch(_){}
+  var __iw=0,__ih=0,__cw=0,__ch=0,__dpr=1;
+  try{__iw=window.innerWidth||0;__ih=window.innerHeight||0}catch(_){}
+  try{__cw=document.documentElement.clientWidth||0;__ch=document.documentElement.clientHeight||0}catch(_){}
+  try{__dpr=window.devicePixelRatio||1}catch(_){}
+  dbg('[DOOM-REMOTE] WVIEW_SIZE viewport='+__iw+'x'+__ih+' client='+__cw+'x'+__ch+' dpr='+__dpr+' visibility='+__vis);
+  dbg('[DOOM-REMOTE] WVIEW_FEATURES fetch='+((typeof window.fetch==='function')?'ok':'no')+' xhr='+((typeof XMLHttpRequest==='function')?'ok':'no')+' worker='+((typeof Worker==='function')?'ok':'no')+' blob='+((typeof Blob==='function')?'ok':'no')+' urlobj='+(((typeof URL==='object')&&(typeof URL.createObjectURL==='function'))?'ok':'no')+' raf='+((typeof requestAnimationFrame==='function')?'ok':'no')+' wasm='+((typeof WebAssembly==='object')?'ok':'no'));
+})();
 const R_PREFIX=${JSON.stringify(DOOM_WASM_PREFIX)};
 const R_PROBES={WDOSBOX:String(R_PREFIX)+'wdosbox.js',WASM:String(R_PREFIX)+'wdosbox.wasm',BUNDLE:__L.bundleUrl};
 var __workerStart=0,__workerErr=false,__sawWasmReq=false,__sawWasmOk=false;
@@ -265,7 +280,9 @@ function hookFetch(){
         const code=(r&&typeof r.status==='number')?r.status:0;
         const ok=code>0&&code<400;
         if(kind==='WASM'&&ok){__sawWasmOk=true}
-        __netMark(kind,ok?'OK':'FAIL',url+(code?' status='+code:''));
+        let clen='';
+        try{clen=(r&&typeof r.headers==='object'&&typeof r.headers.get==='function')?String(r.headers.get('content-length')||''):''}catch(_){}
+        __netMark(kind,ok?'OK':'FAIL',url+(code?' status='+code:'')+(clen?(' content-length='+clen):''));
       },function(e){
         const msg=(e&&(e.name?e.name+': ':'')+(e.message||''))||String(e);
         if(kind==='OTHER'){dbg('[DOOM-REMOTE] OTHER_FAIL '+url+' '+msg)}
@@ -287,7 +304,9 @@ function hookXHR(){
         if(self.__dxhrDone)return;self.__dxhrDone=true;
         const st=self.status,ok=st>0&&st<400;
         if(self.__dk==='WASM'&&ok){__sawWasmOk=true}
-        __netMark(self.__dk,ok?'OK':'FAIL',self.__du+(st?' status='+st:' status=0'));
+        let __sz='';
+        try{const __r=self.response;if(__r&&typeof __r.byteLength==='number'){__sz=' bytes='+__r.byteLength}else if(typeof __r==='string'){__sz=' bytes='+__r.length}}catch(_){}
+        __netMark(self.__dk,ok?'OK':'FAIL',self.__du+(st?' status='+st:' status=0')+__sz);
       };
       const fail=function(e){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' '+(e&&e.type?e.type:'network'))};
       const abrt=function(){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' abort')};
@@ -432,8 +451,8 @@ function fromB64(b64){let bin;try{bin=atob(b64)}catch(e){return null}const u=new
 if(__L.wasmB64){try{__L.wasmBytes=fromB64(__L.wasmB64);dbg('wdosbox.wasm embutido: '+((__L.wasmBytes&&__L.wasmBytes.length)||0)+' bytes')}catch(e){dbg('wasm decode falhou: '+((e&&e.message)||String(e)))}}
 if(__L.bundleB64){try{__L.bundleBytes=fromB64(__L.bundleB64);dbg('bundle embutido: '+((__L.bundleBytes&&__L.bundleBytes.length)||0)+' bytes')}catch(e){dbg('bundle decode falhou: '+((e&&e.message)||String(e)))}}
 
-window.addEventListener('error',function(e){dbg('global error: '+((e&&e.message)||String(e)))},true);
-window.addEventListener('unhandledrejection',function(e){const r=e&&e.reason;dbg('promise rejection: '+((r&&r.message)?(r.name?r.name+': ':'')+r.message:String(r)))},true);
+window.addEventListener('error',function(e){mrk('JS_ERROR');dbg('global error: '+((e&&e.message)||String(e)))},true);
+window.addEventListener('unhandledrejection',function(e){const r=e&&e.reason;mrk('UNHANDLED_REJECTION');dbg('promise rejection: '+((r&&r.message)?(r.name?r.name+': ':'')+r.message:String(r)))},true);
 (function(){
   const oe=console.error,ow=console.warn;
   console.error=function(){const a=[].slice.call(arguments);try{dbg('console.error: '+a.map(function(x){try{return x&&x.message?(x.name?x.name+': ':'')+x.message:String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};oe.apply(console,arguments)};
@@ -597,7 +616,30 @@ function startDoom(){
 }
 function bootDoom(){
   const t0=Date.now();
-  var pollN=0,wdOK=0;
+  var pollN=0,wdOK=0,__canvasSeenAt=0,__frameIdx=0;
+  const __frameTimes=[3,7,12];
+  function checkFrames(cv){
+    try{
+      if(!cv)return;
+      var w=cv.width||0,h=cv.height||0;
+      if(w<=0||h<=0){dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK cv='+w+'x'+h+' (bitmap zerado) - sem amostra');return}
+      var ctx=(typeof cv.getContext==='function')?cv.getContext('2d'):null;
+      if(!ctx){mrk('CANVAS_CONTEXT_WEBGL');dbg('[DOOM-REMOTE] CANVAS_CONTEXT_WEBGL=true (canvas sem contexto 2d) - leitura de pixels nao disponivel');return}
+      mrk('CANVAS_CONTEXT_2D');
+      var sw=Math.min(w,64),sh=Math.min(h,64);
+      var img=ctx.getImageData(0,0,sw,sh);
+      var d=img&&img.data,alphaN=0,colored=0,total=sw*sh;
+      if(d){for(var i=0;i<d.length;i+=4){if(d[i]!==0||d[i+1]!==0||d[i+2]!==0){colored++}if(d[i+3]!==0){alphaN++}}}
+      var desc;
+      if(colored>0){desc='conteudo visivel ('+colored+'/'+total+' amostras)'}
+      else if(alphaN>0){desc='frames chegando mas cena 100% preta (alpha '+alphaN+'/'+total+')'}
+      else{desc='nenhum frame escrito (canvas transparente, alpha=0)'}
+      dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK rect='+sw+'x'+sh+' alpha='+alphaN+' colored='+colored+' -> '+desc);
+      mrk('CANVAS_HAS_NONZERO_PIXELS');
+      dbg('[DOOM-REMOTE] CANVAS_HAS_NONZERO_PIXELS='+(colored>0?'true':'false'));
+      if(colored>0&&!__gameMark){__gameMark=true;mrk('GAME_STARTED');dbg('primeiros pixels nao-pretos vistos (jogo renderizando)')}
+    }catch(e){dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK erro: '+((e&&e.message)||String(e)))}
+  }
   var poll=setInterval(function(){
     if(++pollN>360){clearInterval(poll);return}
     if(typeof window.WDOSBOX==='function'){if(!wdOK){wdOK=1;__netMark('WDOSBOX','OK','script carregou (window.WDOSBOX)')}}
@@ -609,8 +651,8 @@ function bootDoom(){
     }
     var cv=document.querySelector('#dosbox canvas');
     if(cv){
-      if(!__canvasSeen){__canvasSeen=true;mrk('CANVAS_READY');dbg('canvas em #dosbox: '+cv.width+'x'+cv.height)}
-      if(cv.width>0&&cv.height>0&&!__gameMark&&!__runResolved){__gameMark=true;mrk('GAME_STARTED');dbg('canvas com tamanho real (jogo renderizando)')}
+      if(!__canvasSeen){__canvasSeen=true;__canvasSeenAt=Date.now();mrk('CANVAS_FOUND');mrk('CANVAS_READY');dbg('canvas em #dosbox: '+cv.width+'x'+cv.height);if(cv.width>0&&cv.height>0){mrk('CANVAS_SIZE');dbg('[DOOM-REMOTE] CANVAS_SIZE '+cv.width+'x'+cv.height)}else{dbg('[DOOM-REMOTE] CANVAS_SIZE_ZERO=true (bitmap '+cv.width+'x'+cv.height+')')}}
+      if(__frameIdx<__frameTimes.length&&Date.now()-__canvasSeenAt>__frameTimes[__frameIdx]*1000){__frameIdx++;checkFrames(cv)}
     }
     if(__runResolved&&!__gameMark){__gameMark=true;mrk('GAME_STARTED');dbg('run() resolveu (sessao de jogo ativa)')}
   },250);
@@ -625,10 +667,12 @@ function bootDoom(){
     mrk('DOS_RUN');
     __di.run(__L.bundleUrl).then(function(){
       __runResolved=true;
+      mrk('DOS_RUN_RESOLVED');
       if(!finished){finished=true;clearTimeout(watchdog);clearInterval(poll);setStatus('DOOM pronto','ready');dbg('DOOM inicializado em '+((Date.now()-t0)/1000).toFixed(1)+'s')}
       mrk('GAME_STARTED');
     }).catch(function(e){
       if(!finished){finished=true;clearTimeout(watchdog);clearInterval(poll)}
+      mrk('DOS_RUN_REJECTED');
       const msg=(e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e));
       setStatus('Erro: '+msg,'error');
       dbg('[DOOM-REMOTE] FALHA em run(): '+msg);
@@ -673,9 +717,9 @@ function normalizeDoomBundleUrl(bundleUrl = '') {
   return trimmed;
 }
 
-async function sendDoomRichHtml(sock, jid, label, html, trustedSources = []) {
+async function sendDoomRichHtml(sock, jid, label, html, trustedSources = [], url = '') {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
-  const richContent = buildAIRichMessageContent(html, { label, trustedSources });
+  const richContent = buildAIRichMessageContent(html, { label, trustedSources, url });
   const check = checkAirichPayloadWithinLimit(html, richContent);
   if (!check.ok) {
     console.log(`[${label}] htmlBytes=${check.metrics.htmlBytes}`);
@@ -706,7 +750,8 @@ function sendDoomExperimental(sock, jid, bundleUrl = '', opts) {
   const url = bundleUrl ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
   const html = buildDoomPlayerHtml(url, remoteOpts);
   const trustedSources = remoteOpts.embedWdosbox || remoteOpts.embedBundle ? [] : [...DOOM_TRUSTED_SOURCES];
-  return sendDoomRichHtml(sock, jid, 'DOOM', html, trustedSources);
+  const runtimeUrl = trustedSources.length ? DOOM_RUNTIME_URL : '';
+  return sendDoomRichHtml(sock, jid, 'DOOM', html, trustedSources, runtimeUrl);
 }
 
 export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_TRUSTED_SOURCES, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
