@@ -40,7 +40,7 @@ const WDOSBOX_JS = readDoomAsset('wdosbox.js');
 const WDOSBOX_WASM_B64 = readDoomAssetB64('wdosbox.wasm');
 
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
-const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
+const DOOM_BUNDLE_URL = 'https://cdn.jsdelivr.net/gh/negaonaunperdoa999-ux/nazuna-pessoal@main/dados/src/funcs/private/doom/assets/doom.jsdos';
 const DOOM_RUNTIME_URL = DOOM_WASM_PREFIX;
 const DOOM_TRUSTED_SOURCES = [
   'https://cdn.jsdelivr.net',
