@@ -791,3 +791,31 @@ Verificacoes:
 - `git diff --check` limpo; bundle `assets/doom.jsdos` nao versionado (check-ignore).
 - Tamanhos: HTML default 2.697.450 bytes; com embedBundle 10.083.836 bytes.
 - Limite remanescente: validacao on-device do WebView apenas com o bot autenticado; o painel `#doomDbg` dirá a etapa/lindo do erro real no proximo teste.
+
+Data: 2026-09-25
+Objetivo:
+- Corrigir o /doon no aparelho: com 590e236 o motor ficou local (wdosbox.js/.wasm + XHR/Worker interceptados), mas o bundle `doom.jsdos` continuava remoto por padrao (cdn.dos.zone) - no WebView do WhatsApp (que bloqueia rede externa; o GBA 100% local funciona) o download do bundle falhava silenciosamente e o jogo nao iniciava. Auditar o bundle minificado do js-dos 7.5.0, confirmar a unica dependencia externa restante e tornar o /doon 100% local por padrao (paridade GBA).
+
+Arquivos modificados:
+- dados/src/funcs/private/doomRichHtml.js (default do bundle: embutido; aviso de tamanho de payload no #doomDbg)
+- Resumo_projeto.txt (esta entrada)
+
+Alteracoes realizadas:
+- Auditoria do bundle js-dos 7.5.0 (minificado, modulo a modulo): o boot usa 3 pontos de XHR no main thread - `resolveBundle` (modulo 43) para o bundle `.jsdos`, e `httpRequest` (modulo 144) para `wdosbox.wasm` (arraybuffer) e `wdosbox.js` (texto, para `eval.call(window)`); o `new Worker(url)` so cria o worker, recebendo o `WebAssembly.Module` ja compilado via mensagem `wc-install` (o glue no worker usa `instantiateWasm` proprio, sem rede). Todos os metodos usados (open/overrideMimeType/responseType/onreadystatechange/setRequestHeader/send/addEventListener+onprogress/leitura de .response) ja estavam cobertos pelo Fake XHR - auditoria confirmou que o bridge atual e fiel; a unica dependencia externa restante do /doon era o bundle remoto.
+- `embedBundle` agora liga por padrao quando `assets/doom.jsdos` existe: `buildDoomPlayerBridge` tenta `readDoomBundleB64()` (try/catch; falha cai para remoto) e so respeita `options.embedBundle === false` para forcar versao remota de teste.
+- `#doomDbg`: etapa 2 agora mostra o tamanho do bundle embutido (em MB) e, quando >5 MB, um AVISO com a estimativa de payload total, para detectar truncamento do HTML causado pelo WhatsApp.
+- Contrato preservado: protocolo AIRich/sendAIRichHtml.js, index.js, layout (doomOrientation.js intocado), controls/inputs, `doontest`, exports e alias `buildDoomExperimentalHtml`.
+
+Bugs encontrados:
+- /doon produzia payload correto (htmlBytes=2698363, unifiedResponseBytes=2722023, hasRichResponseMessage=true) e a mensagem era enviada, mas o jogo nao iniciava no cliente: bundle ainda remoto (cdn.dos.zone) num WebView com rede externa bloqueada - falha silenciosa do `Dos.run()` na resolucao do bundle.
+- O log nao indicava o erro client-side (sem o texto do painel #doomDbg do aparelho era impossivel distinguir rede vs wasm/worker), corrigido com mais diagnostico visivel.
+
+Bugs corrigidos:
+- /doon agora e 100% local por padrao (bundle embutido em base64), eliminando a ultima dependencia de rede - mesmo padrao do GBA que funciona.
+- Falha de asset ausente nao derruba mais o envio: se `assets/doom.jsdos` nao existir e o default estiver ativo, recua para o bundle remoto em vez de lancar excecao.
+
+Verificacoes:
+- `node --check` exit 0 em `doomRichHtml.js`.
+- Probe estrutural: default agora embute o bundle - HTML 10.084.121 bytes (9,6 MiB), `__L.bundleB64` preenchido, Fake XHR com rota `.jsdos` presente; `embedBundle:false` mantem variante remota de 2.697.735 bytes com `__L.bundleB64=null`; js-dos.js e css injetados; worker via Blob; checagem `typeof Dos==='undefined'` e tail `</html>` presentes em ambas.
+- Nao commitado na confirmacao do usuario; apos autorizacao, commit + push para main com entrada no Resumo.
+- Remanescente: tamanho do payload (10,1 MB) e o comportamento real no WebView dependem de teste on-device (painel #doomDbg); logs [TEMP-DIAG] de connect.js/index.js continuam nao commitados.

@@ -199,10 +199,19 @@ function buildDoomDiagnosticCss() {
 
 function buildDoomPlayerBridge(bundleUrl, options) {
   const embedWdosbox = options.embedWdosbox !== false;
-  const embedBundle = options.embedBundle === true;
+  let embedBundle = false;
+  let bundleB64 = null;
+  if (embedWdosbox && options.embedBundle !== false) {
+    try {
+      bundleB64 = readDoomBundleB64();
+      embedBundle = true;
+    } catch (_) {
+      embedBundle = false;
+    }
+  }
   const wdosboxJsLiteral = embedWdosbox ? toJsStringLiteral(WDOSBOX_JS) : 'null';
   const wasmB64Literal = embedWdosbox ? JSON.stringify(WDOSBOX_WASM_B64) : 'null';
-  const bundleB64Literal = embedBundle ? JSON.stringify(readDoomBundleB64()) : 'null';
+  const bundleB64Literal = embedBundle ? JSON.stringify(bundleB64) : 'null';
   const bundleLiteral = JSON.stringify(bundleUrl);
   return `
 const doomStatus=document.getElementById('doomStatus');
@@ -369,7 +378,8 @@ function startDoom(){
     window.emulators=window.emulators||{};
     window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';
     dbg('Etapa 1: js-dos carregado; pathPrefix='+window.emulators.pathPrefix);
-    dbg('Etapa 2: '+(__L.wasmBytes?'wdosbox.js/.wasm LOCAIS':'wdosbox via rede')+' ; bundle '+(__L.bundleBytes?'LOCAL':'remoto')+': '+__L.bundleUrl);
+    dbg('Etapa 2: '+(__L.wasmBytes?'wdosbox.js/.wasm LOCAIS':'wdosbox via rede')+' ; bundle '+(__L.bundleBytes?'LOCAL ('+Math.round((__L.bundleBytes.length/1048576)*10)/10+' MB)':'remoto')+': '+__L.bundleUrl);
+    if(__L.bundleBytes&&__L.bundleBytes.length>5242880){dbg('AVISO: bundle embutido gera payload ~'+Math.round((2.7+(__L.bundleB64?__L.bundleB64.length:0)/1048576)*10)/10+' MB; se o HTML chegar truncado, o jogo nao inicia')}
     setStatus('Baixando o jogo...','');
     const t0=Date.now();
     const watchdog=setTimeout(function(){
