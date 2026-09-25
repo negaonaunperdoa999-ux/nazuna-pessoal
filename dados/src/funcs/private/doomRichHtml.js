@@ -208,7 +208,10 @@ function buildDoomPlayerControlsHtml() {
 
 function buildDoomDiagnosticCss() {
   return `
-.doom-diagnostics{grid-area:diag;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:14px}
+.doom-diagnostics{grid-area:diag;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:14px;width:100%}
+.doom-err{display:none;width:100%;max-height:150px;overflow:auto;-webkit-overflow-scrolling:touch;color:#ffb3ab;font:10px/1.35 Consolas,Monaco,monospace;background:rgba(30,8,8,0.7);border:1px solid #6b2a2a;border-radius:6px;padding:4px 6px;white-space:pre-wrap;word-break:break-all;text-align:left}
+.doom-err.show{display:block}
+.doom-probe-seq{display:block;width:100%;max-height:104px;overflow:auto;-webkit-overflow-scrolling:touch;color:#cfe1ec;font:10px/1.35 Consolas,Monaco,monospace;background:rgba(0,0,0,0.45);border:1px solid #33506b;border-radius:6px;padding:4px 6px;white-space:pre-wrap;word-break:break-all;text-align:left}
 .doom-dbg{display:none;width:100%;max-height:120px;overflow:auto;-webkit-overflow-scrolling:touch;text-align:left;color:#9fb6c3;font:10px/1.4 Consolas,Monaco,monospace;background:rgba(0,0,0,0.55);border:1px solid #2a3c49;border-radius:6px;padding:4px 6px;white-space:pre-wrap;word-break:break-word}
 .doom-dbg.show{display:block}`;
 }
@@ -247,10 +250,49 @@ __L.trustedSources=${trustedSourcesLiteral};
 __L.runtimeUrl=${runtimeUrlLiteral};
 
 var __netDedup={};
-function mrk(m){if(__netDedup['M:'+m])return;__netDedup['M:'+m]=1;dbg('[DOOM-REMOTE] '+m);try{console.log('[DOOM-REMOTE] '+m)}catch(_){}}
+var __seqVal={};
+function mrk(m){if(__netDedup['M:'+m])return;__netDedup['M:'+m]=1;__seqVal[m]='1';dbg('[DOOM-REMOTE] '+m);try{console.log('[DOOM-REMOTE] '+m)}catch(_){}}
 function __netMark(kind,phase,extra){const k=kind+'|'+phase;if(__netDedup[k])return;__netDedup[k]=1;const l='[DOOM-REMOTE] '+kind+'_'+phase+(extra?' '+extra:'');dbg(l);try{console.log(l)}catch(_){}}
 var __dia={};
-function dia(key,value){if(__dia[key])return;__dia[key]=1;const l='[DOOM-DIAG] '+key+'='+String(value);dbg(l);try{console.log(l)}catch(_){}}
+function dia(key,value){if(__dia[key])return;__dia[key]=1;__seqVal[key]=String(value);const l='[DOOM-DIAG] '+key+'='+String(value);dbg(l);try{console.log(l)}catch(_){}}
+var PROBE_ORDER=['BUNDLE_FETCH_STATUS','BUNDLE_WORKER_OK','DOS_RUN_RESOLVED','CANVAS_FOUND','CANVAS_READY','CANVAS_SIZE','CANVAS_SIZE_ZERO','CANVAS_CONTEXT_2D','CANVAS_CONTEXT_WEBGL','CANVAS_FRAME_CHECK','CANVAS_HAS_NONZERO_PIXELS','CANVAS_PIXEL_SAMPLE','FRAMEBUFFER_READY','FRAME_1','FRAME_2','CANVAS_VISIBLE','CANVAS_RECT','GAME_STARTED','JS_ERROR','UNHANDLED_REJECTION'];
+function renderSeq(){
+  var el=document.getElementById('doomProbeSeq');if(!el)return;
+  var out=[];
+  for(var i=0;i<PROBE_ORDER.length;i++){
+    var k=PROBE_ORDER[i];
+    var v=__seqVal[k];
+    var s=(v==null)?'0':String(v);
+    if(s.length>34)s=s.slice(0,34)+'...';
+    out.push((i<9?'0':'')+(i+1)+' '+k+'='+s);
+  }
+  el.textContent=out.join('\\n');
+}
+renderSeq();
+var __errSeq=0,__fullErrs=[];
+function capErr(tag,obj,extra){
+  try{
+    if(__errSeq>=8)return;
+    var msg=String((obj&&obj.message)?obj.message:(obj&&obj.reason&&obj.reason.message?obj.reason.message:obj));
+    if(!msg)return;
+    var stt='';
+    try{stt=String((obj&&obj.stack)||(obj&&obj.error&&obj.error.stack)||(obj&&obj.reason&&obj.reason.stack&&obj.reason.stack)||extra||'')}catch(_){}
+    __errSeq++;
+    var k='ERR_'+__errSeq;
+    __seqVal[k]=msg;
+    if(!__seqVal['ERR_FIRST']){__seqVal['ERR_FIRST']=msg}
+    __seqVal['FULL_ERROR']=msg;
+    __seqVal['ERR_STACK']=stt?stt:'(sem stack)';
+    var full=tag+': '+msg+(stt?('\\nSTACK:\\n'+stt):'');
+    __fullErrs.push(full);
+    try{console.log('[DOOM-ERR] '+k+' FULL_ERROR='+JSON.stringify(full))}catch(_){}
+    try{
+      var el=document.getElementById('doomErrDump');
+      if(el){el.textContent=(el.textContent?el.textContent+'\\n\\n':'')+k+' ['+tag+']\\n'+full;el.scrollTop=el.scrollHeight;try{if(!el.classList.contains('show'))el.classList.add('show')}catch(_){}}
+    }catch(_){}
+    dbg('[DOOM-ERR] '+k+' capturado ('+tag+')');
+  }catch(_){}
+}
 mrk('HTML_LOADED');
 (function(){
   var __href='';try{__href=String((typeof location!=='undefined'&&location.href)||'')}catch(_){}
@@ -324,7 +366,7 @@ function hookXHR(){
   if(typeof XMLHttpRequest==='undefined')return;
   const proto=XMLHttpRequest.prototype;
   const open=proto.open,send=proto.send;
-  proto.open=function(m,u){this.__du=String(u||'');this.__dk=kindOf(this.__du);if(this.__dk==='WASM'){__sawWasmReq=true}if(this.__dk!=='OTHER'){__netMark(this.__dk,'REQUEST',this.__du)}return open.apply(this,arguments)};
+  proto.open=function(m,u){this.__du=String(u||'');this.__dk=kindOf(this.__du);if(this.__dk==='WASM'){__sawWasmReq=true}if(this.__dk!=='OTHER'){__netMark(this.__dk,'REQUEST',this.__du)}if(this.__dk==='BUNDLE'){__seqVal['ERR_URL']=this.__du}return open.apply(this,arguments)};
   proto.send=function(){
     const self=this;
     if(self.__dk&&self.__dk!=='OTHER'){
@@ -332,12 +374,13 @@ function hookXHR(){
         if(self.__dxhrDone)return;self.__dxhrDone=true;
         const st=self.status,ok=st>0&&st<400;
         if(self.__dk==='WASM'&&ok){__sawWasmOk=true}
+        if(self.__dk==='BUNDLE'){__seqVal['ERR_URL']=self.__du}
         let __sz='';
         try{const __r=self.response;if(__r&&typeof __r.byteLength==='number'){__sz=' bytes='+__r.byteLength}else if(typeof __r==='string'){__sz=' bytes='+__r.length}}catch(_){}
         __netMark(self.__dk,ok?'OK':'FAIL',self.__du+(st?' status='+st:' status=0')+__sz);
       };
-      const fail=function(e){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' '+(e&&e.type?e.type:'network'))};
-      const abrt=function(){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' abort')};
+      const fail=function(e){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' '+(e&&e.type?e.type:'network'));if(self.__dk==='BUNDLE'){__seqVal['ERR_URL']=self.__du;capErr('XHR_BUNDLE',{message:'XHR network'+(e&&e.type?(' '+e.type):'')+' status='+((self.status===undefined||self.status===0)?'0(nao enviado/CORS)':self.status)+' url='+self.__du,stack:''})}};
+      const abrt=function(){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' abort');if(self.__dk==='BUNDLE'){__seqVal['ERR_URL']=self.__du;capErr('XHR_BUNDLE',{message:'XHR abort url='+self.__du,stack:''})}};
       self.addEventListener('load',done);
       self.addEventListener('error',fail);
       self.addEventListener('abort',abrt);
@@ -355,7 +398,7 @@ function hookWorker(){
     if(kind!=='OTHER'){__netMark(kind,'REQUEST',u)}
     const w=new Orig(url,opts);
     if(kind==='WDOSBOX'){
-      w.addEventListener('error',function(e){__workerErr=true;__netMark('WDOSBOX','FAIL','worker error')});
+      w.addEventListener('error',function(e){__workerErr=true;__netMark('WDOSBOX','FAIL','worker error');capErr('WORKER',{message:e&&e.message?('worker error: '+e.message):'worker error (sem detalhe)',stack:e&&e.message||''})});
     }
     return w;
   }
@@ -480,6 +523,7 @@ function bundleIsoTest(){
     .then(function(){return runXhr('XHR')})
     .then(function(){
       var g=res.GET||'',x=res.XHR||'',h=res.HEAD||'',r=res.RANGE||'',n=res.NOCORS||'';
+      if(/status=[2-3]\d\d/.test(g)||/status=[2-3]\d\d/.test(x)){__bundleOk=true;dbg('[DOOM-REMOTE] BUNDLE_FETCH_STATUS ok (GET/XHR 2xx) -> __bundleOk=true')}
       dia('BUNDLE_FETCH_METHOD','GET|XHR|HEAD|RANGE|NOCORS (amostra)');
       dia('BUNDLE_FETCH_STATUS',g+' | '+x+' | '+h+' | '+r+' | '+n);
       dia('BUNDLE_FETCH_RESPONSE','GET: '+g+' | NOCORS: '+n);
@@ -566,11 +610,11 @@ function fromB64(b64){let bin;try{bin=atob(b64)}catch(e){return null}const u=new
 if(__L.wasmB64){try{__L.wasmBytes=fromB64(__L.wasmB64);dbg('wdosbox.wasm embutido: '+((__L.wasmBytes&&__L.wasmBytes.length)||0)+' bytes')}catch(e){dbg('wasm decode falhou: '+((e&&e.message)||String(e)))}}
 if(__L.bundleB64){try{__L.bundleBytes=fromB64(__L.bundleB64);dbg('bundle embutido: '+((__L.bundleBytes&&__L.bundleBytes.length)||0)+' bytes')}catch(e){dbg('bundle decode falhou: '+((e&&e.message)||String(e)))}}
 
-window.addEventListener('error',function(e){mrk('JS_ERROR');dia('JS_ERROR','true');dbg('global error: '+((e&&e.message)||String(e)))},true);
-window.addEventListener('unhandledrejection',function(e){const r=e&&e.reason;mrk('UNHANDLED_REJECTION');dia('UNHANDLED_REJECTION','true');dbg('promise rejection: '+((r&&r.message)?(r.name?r.name+': ':'')+r.message:String(r)))},true);
+window.addEventListener('error',function(e){mrk('JS_ERROR');dia('JS_ERROR','true');dbg('global error: '+((e&&e.message)||String(e)));capErr('JS_ERROR',(e&&(e.error||e.message))||null,e&&(e.filename||''))},true);
+window.addEventListener('unhandledrejection',function(e){const r=e&&e.reason;mrk('UNHANDLED_REJECTION');dia('UNHANDLED_REJECTION','true');dbg('promise rejection: '+((r&&r.message)?(r.name?r.name+': ':'')+r.message:String(r)));capErr('UNHANDLED_REJECTION',r&&{message:r.message,stack:r.stack}||null)},true);
 (function(){
   const oe=console.error,ow=console.warn;
-  console.error=function(){const a=[].slice.call(arguments);try{dbg('console.error: '+a.map(function(x){try{return x&&x.message?(x.name?x.name+': ':'')+x.message:String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};oe.apply(console,arguments)};
+  console.error=function(){const a=[].slice.call(arguments);try{dbg('console.error: '+a.map(function(x){try{return x&&x.message?(x.name?x.name+': ':'')+x.message:String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};for(var ci=0;ci<a.length;ci++){try{var cx=a[ci];if(cx&&(cx.message||cx.stack))capErr('CONSOLE_ERROR',cx)}catch(_){}}oe.apply(console,arguments)};
   console.warn=function(){const a=[].slice.call(arguments);try{dbg('console.warn: '+a.map(function(x){try{return String(x)}catch(_){return String(x)}}).join(' | '))}catch(_){};ow.apply(console,arguments)};
 })();
 
@@ -709,7 +753,18 @@ if(__L.embedded&&typeof OrigFetch==='function'){
 }
 
 let finished=false;
-var __runResolved=false,__canvasSeen=false,__gameMark=false;
+var __runResolved=false,__canvasSeen=false,__gameMark=false,__bundleOk=false,__bwOK=false;
+var __cvSeen=[];
+function cvTag(c){
+  if(!c)return '?';
+  try{
+    var p=c.parentElement||null,pp=p?p.parentElement:null;
+    var pn=p?((p.id&&p.id.length)?('# '+p.id):('.'+String(p.className||'').split(' ')[0])):'?';
+    var ppn=pp?('.'+String(pp.className||'').split(' ')[0]):'?';
+    var r=null;try{r=c.getBoundingClientRect()}catch(_){ }
+    return 'cls='+String(c.className||'')+' | '+pn+' > '+ppn+' | rect='+(r?(Math.round(r.width)+'x'+Math.round(r.height)):'0x0');
+  }catch(_){return '?'}
+}
 function startDoom(){
   mrk('JS_DOS_LOADING');
   setStatus('Iniciando DOOM...','');
@@ -733,35 +788,63 @@ function startDoom(){
 function bootDoom(){
   const t0=Date.now();
   var pollN=0,wdOK=0,__canvasSeenAt=0,__frameIdx=0,__frameRun=0,__fbReady=0,__bwK=0,__bwE=0;
-  const __frameTimes=[3,7,12];
+  const __frameTimes=[3,7,12,30];
+  var __prevSample=null,__lastLite=0,__frameDelta='-';
   function checkFrames(cv){
     try{
       if(!cv)return;
+      mrk('CANVAS_FRAME_CHECK');
       var w=cv.width||0,h=cv.height||0;
-      if(w<=0||h<=0){dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK cv='+w+'x'+h+' (bitmap zerado) - sem amostra');return}
+      if(w<=0||h<=0){__seqVal['CANVAS_SIZE_ZERO']=w+'x'+h;dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK cv='+w+'x'+h+' (bitmap zerado) - sem amostra');return}
+      __seqVal['CANVAS_SIZE']=w+'x'+h;
       var ctx=(typeof cv.getContext==='function')?cv.getContext('2d'):null;
-      if(!ctx){mrk('CANVAS_CONTEXT_WEBGL');dia('CANVAS_CONTEXT','webgl');dbg('[DOOM-REMOTE] CANVAS_CONTEXT_WEBGL=true (canvas sem contexto 2d) - leitura de pixels nao disponivel');return}
-      mrk('CANVAS_CONTEXT_2D');
+      if(!ctx){mrk('CANVAS_CONTEXT_WEBGL');__seqVal['CANVAS_CONTEXT_WEBGL']='1';dia('CANVAS_CONTEXT','webgl');dbg('[DOOM-REMOTE] CANVAS_CONTEXT_WEBGL=true (canvas sem contexto 2d) - leitura de pixels nao disponivel');return}
+      mrk('CANVAS_CONTEXT_2D');__seqVal['CANVAS_CONTEXT_2D']='1';
       dia('CANVAS_CONTEXT','2d');
       if(!__fbReady&&w>0&&h>0){__fbReady=1;dia('FRAMEBUFFER_READY','true')}
       if(__frameRun<3)__frameRun++;
       if(__frameRun===1)dia('FRAME_1','check-run');
       if(__frameRun===2)dia('FRAME_2','check-run');
-      var sw=Math.min(w,64),sh=Math.min(h,64);
-      var img=ctx.getImageData(0,0,sw,sh);
-      var d=img&&img.data,alphaN=0,colored=0,total=sw*sh;
-      if(d){for(var i=0;i<d.length;i+=4){if(d[i]!==0||d[i+1]!==0||d[i+2]!==0){colored++}if(d[i+3]!==0){alphaN++}}}
+      var img=ctx.getImageData(0,0,w,h);
+      var d=img&&img.data;
+      if(!d||!d.length){dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK sem dados de pixels');return}
+      var alphaN=0,colored=0,total=w*h,step=4;
+      for(var i=0;i<d.length;i+=step){if(d[i]!==0||d[i+1]!==0||d[i+2]!==0){colored++}if(d[i+3]!==0){alphaN++}}
+      var deltaExato=-1;
+      if(__prevSample&&__prevSample.length===d.length){
+        var ch=0;
+        for(var j=0;j<d.length;j+=4){if(__prevSample[j]!==d[j]||__prevSample[j+1]!==d[j+1]||__prevSample[j+2]!==d[j+2]){ch++}}
+        deltaExato=ch;
+        if(__frameDelta!==String(ch)){__frameDelta=String(ch);dbg('[DOOM-REMOTE] CANVAS_FRAME_DELTA='+ch+' px alterados desde a amostra anterior')}
+      }
+      __prevSample=d.slice(0);
       var desc;
-      if(colored>0){desc='conteudo visivel ('+colored+'/'+total+' amostras)'}
-      else if(alphaN>0){desc='frames chegando mas cena 100% preta (alpha '+alphaN+'/'+total+')'}
-      else{desc='nenhum frame escrito (canvas transparente, alpha=0)'}
-      dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK rect='+sw+'x'+sh+' alpha='+alphaN+' colored='+colored+' -> '+desc);
-      dia('CANVAS_PIXEL_SAMPLE',sw+'x'+sh+' alpha='+alphaN+' colored='+colored);
+      if(colored>0){desc='conteudo visivel ('+colored+'/'+total+' px)'}
+      else if(alphaN>0){desc='frames CHEGANDO porem 100% pretos (alpha '+alphaN+'/'+total+', delta='+deltaExato+')'}
+      else{desc='nenhum frame escrito (transparente, alpha=0, delta='+deltaExato+')'}
+      dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK '+w+'x'+h+' alpha='+alphaN+' colored='+colored+' delta='+deltaExato+' -> '+desc);
+      dia('CANVAS_PIXEL_SAMPLE',w+'x'+h+' colored='+colored+'/'+total+' alpha='+alphaN+' delta='+deltaExato);
       dia('NONZERO_PIXELS',colored>0?'true':'false');
       mrk('CANVAS_HAS_NONZERO_PIXELS');
       dbg('[DOOM-REMOTE] CANVAS_HAS_NONZERO_PIXELS='+(colored>0?'true':'false'));
       if(colored>0&&!__gameMark){__gameMark=true;mrk('GAME_STARTED');dbg('primeiros pixels nao-pretos vistos (jogo renderizando)')}
     }catch(e){dbg('[DOOM-REMOTE] CANVAS_FRAME_CHECK erro: '+((e&&e.message)||String(e)))}
+  }
+  function liteSample(cv){
+    try{
+      var now=Date.now();
+      if(now-__lastLite<900)return;
+      if(!cv||cv.width<=0||cv.height<=0)return;
+      __lastLite=now;
+      var ctx=cv.getContext&&cv.getContext('2d');
+      if(!ctx)return;
+      var w=Math.min(cv.width,64),h=Math.min(cv.height,64);
+      var img=ctx.getImageData(0,0,w,h);
+      if(!img||!img.data)return;
+      var d=img.data,cnt=0;
+      for(var i=0;i<d.length;i+=4){if(d[i]!==0||d[i+1]!==0||d[i+2]!==0){cnt++}}
+      dbg('[DOOM-REMOTE] LITE_SAMPLE '+w+'x'+h+' nao-pretos='+cnt);
+    }catch(_){}
   }
   var poll=setInterval(function(){
     if(++pollN>360||__frameIdx>=__frameTimes.length){clearInterval(poll);return}
@@ -774,9 +857,19 @@ function bootDoom(){
       if(Date.now()-__workerStart>5000&&!__sawWasmOk){__sawWasmOk=true;mrk('WASM_OK');dbg('WASM_OK (inferido: Worker vivo 5s sem erro de rede)')}
     }
     if(__workerErr&&!__bwE){__bwE=1;dia('BUNDLE_WORKER_ERROR','true (worker reportou erro)')}
+    if(!__bundleOk&&__netDedup['BUNDLE|OK']){__bundleOk=true;dbg('[DOOM-REMOTE] BUNDLE_OK confirmado via hook XHR (resolveBundle)')}
+    if(__workerStart&&!__workerErr&&__bundleOk&&!__bwOK){__bwOK=1;dia('BUNDLE_WORKER_OK','true (worker criado, sem erro; bundle transferido ao worker)')}
+    var cvAll=document.querySelectorAll('canvas');
+    for(var ai=0;ai<cvAll.length;ai++){
+      var ac=cvAll[ai];
+      if(__cvSeen.indexOf(ac)>=0)continue;
+      __cvSeen.push(ac);
+      dbg('[CANVASES] canvas#'+__cvSeen.length+' bitmap='+ac.width+'x'+ac.height+' parent='+cvTag(ac));
+    }
     var cv=document.querySelector('#dosbox canvas');
     if(cv){
-      if(!__canvasSeen){__canvasSeen=true;__canvasSeenAt=Date.now();mrk('CANVAS_FOUND');mrk('CANVAS_READY');dia('CANVAS_FOUND','true');dia('CANVAS_WIDTH',cv.width);dia('CANVAS_HEIGHT',cv.height);dbg('canvas em #dosbox: '+cv.width+'x'+cv.height);if(cv.width>0&&cv.height>0){mrk('CANVAS_SIZE');dbg('[DOOM-REMOTE] CANVAS_SIZE '+cv.width+'x'+cv.height)}else{dbg('[DOOM-REMOTE] CANVAS_SIZE_ZERO=true (bitmap '+cv.width+'x'+cv.height+')')}}
+      if(!__canvasSeen){__canvasSeen=true;__canvasSeenAt=Date.now();mrk('CANVAS_FOUND');mrk('CANVAS_READY');dia('CANVAS_FOUND','true');dia('CANVAS_WIDTH',cv.width);dia('CANVAS_HEIGHT',cv.height);dia('CANVAS_PARENT',cvTag(cv));dbg('canvas em #dosbox: '+cv.width+'x'+cv.height+' ('+cvTag(cv)+')');if(cv.width>0&&cv.height>0){mrk('CANVAS_SIZE');__seqVal['CANVAS_SIZE']=cv.width+'x'+cv.height;dbg('[DOOM-REMOTE] CANVAS_SIZE '+cv.width+'x'+cv.height)}else{__seqVal['CANVAS_SIZE_ZERO']=cv.width+'x'+cv.height;dbg('[DOOM-REMOTE] CANVAS_SIZE_ZERO=true (bitmap '+cv.width+'x'+cv.height+')')}}
+      liteSample(cv);
       try{
         var cr=typeof cv.getBoundingClientRect==='function'?cv.getBoundingClientRect():null;
         if(cr){
@@ -785,11 +878,14 @@ function bootDoom(){
           var vis=cr.width>0&&cr.height>0&&cr.bottom>2&&cr.top<__vh-2&&cr.right>2&&cr.left<__vw-2;
           dia('CANVAS_VISIBLE',vis?'true':'false');
           dia('CANVAS_RECT','x='+Math.round(cr.left)+' y='+Math.round(cr.top)+' w='+Math.round(cr.width)+' h='+Math.round(cr.height)+' view='+__vw+'x'+__vh);
+          __seqVal['CANVAS_VISIBLE']=vis?'true':'false';
+          __seqVal['CANVAS_RECT']=Math.round(cr.width)+'x'+Math.round(cr.height)+'@'+Math.round(cr.left)+','+Math.round(cr.top);
         }
       }catch(_e){}
       if(__frameIdx<__frameTimes.length&&Date.now()-__canvasSeenAt>__frameTimes[__frameIdx]*1000){__frameIdx++;checkFrames(cv)}
     }
     if(__runResolved&&!__gameMark){__gameMark=true;mrk('GAME_STARTED');dbg('run() resolveu (sessao de jogo ativa)')}
+    renderSeq();
   },250);
   const watchdog=setTimeout(function(){
     if(!finished){finished=true;clearInterval(poll);setStatus('Timeout '+Math.round((Date.now()-t0)/1000)+'s (rede/wasm?)','error');dbg('[DOOM-REMOTE] TIMEOUT em '+((Date.now()-t0)/1000).toFixed(1)+'s (90s sem progresso)')}
@@ -823,6 +919,9 @@ function bootDoom(){
       mrk('DOS_RUN_REJECTED');
       dia('DOS_RUN_REJECTED','true');
       const msg=(e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e));
+      __seqVal['FULL_ERROR']=msg;
+      __seqVal['ERR_URL']=__L.bundleUrl;
+      capErr('DOS_RUN_REJECTED',e);
       setStatus('Erro: '+msg,'error');
       dbg('[DOOM-REMOTE] FALHA em run(): '+msg);
       if(e&&e.stack){try{dbg('stack: '+String(e.stack).split('\\n').slice(0,5).join(' ~ '))}catch(_){}}
@@ -851,7 +950,7 @@ ${buildDoomPlayerControlsHtml()}
   <button type="button" class="sys" id="tab">TAB</button>
   <button type="button" class="sys" id="enter">ENTER</button>
 </div>
-<div class="doom-diagnostics"><div class="doom-diag" id="doomDiag"></div><div class="doom-dbg" id="doomDbg"></div></div>
+<div class="doom-diagnostics"><div class="doom-err" id="doomErrDump"></div><div class="doom-probe-seq" id="doomProbeSeq"></div><div class="doom-diag" id="doomDiag"></div><div class="doom-dbg" id="doomDbg"></div></div>
 </main><script>${JSDOS_JS}
 </script>
 <script>${buildDoomOrientationScript()}</script>
