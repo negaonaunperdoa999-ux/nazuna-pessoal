@@ -418,6 +418,20 @@ async function clearAuthDir(dirToRemove = AUTH_DIR) {
     }
 }
 
+function hasExplicitSessionRemovalEvidence(error) {
+    const statusCode = new Boom(error)?.output?.statusCode;
+    if (statusCode === DisconnectReason.loggedOut) return true;
+    const data = error?.data;
+    const attrs = data?.attrs ?? (Array.isArray(data) ? data[0]?.attrs : null);
+    const reasonTag = data?.tag ?? (Array.isArray(data) ? data[0]?.tag : null);
+    const reasonAttr = attrs?.reason;
+    const message = String(error?.message || '');
+    if (reasonAttr === '401' || reasonAttr === 401) return true;
+    if (reasonTag === 'not-authorized' || reasonTag === 'not_authorized') return true;
+    if (/logout|logged out|device (?:removed|deleted|unlinked)|not.?authoriz/i.test(message)) return true;
+    return false;
+}
+
 async function loadGroupSettings(groupId) {
     const groupFilePath = path.join(DATABASE_DIR, 'grupos', `${groupId}.json`);
     try {
@@ -1698,9 +1712,15 @@ async function createBotSocket(authDir) {
 
                 forbidden403Attempts = 0;
 
-                if (reason === DisconnectReason.badSession || reason === DisconnectReason.loggedOut) {
+                const isLoggedOut = reason === DisconnectReason.loggedOut;
+                const isBadSession = reason === DisconnectReason.badSession;
+                const explicitRemoval = isLoggedOut || (isBadSession && hasExplicitSessionRemovalEvidence(lastDisconnect?.error));
+
+                if (explicitRemoval) {
                     await clearAuthDir(authDir);
                     console.log('🔄 Nova autenticação será necessária na próxima inicialização.');
+                } else if (isBadSession) {
+                    console.log('⚠️ Código 500 (badSession) SEM evidência de logout real (transport/servidor). Mantendo credenciais e tentando reconectar...');
                 }
 
 
@@ -1715,7 +1735,7 @@ async function createBotSocket(authDir) {
                     reconnectDelay = 3000; 
                 } else if (reason === DisconnectReason.connectionLost) {
                     reconnectDelay = 2000; 
-                } else if (reason === DisconnectReason.loggedOut || reason === DisconnectReason.badSession) {
+                } else if (explicitRemoval || isBadSession) {
                     reconnectDelay = 10000; 
                 }
 

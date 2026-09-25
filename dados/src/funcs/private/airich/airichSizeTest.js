@@ -1,4 +1,4 @@
-import { buildAIRichMessageContent, sendAIRichHtml } from './sendAIRichHtml.js';
+import { buildAIRichMessageContent, getAirichSafeMaxBytes, sendAIRichHtml } from './sendAIRichHtml.js';
 
 const SEND_INTERVAL_MS = 2500;
 
@@ -56,45 +56,41 @@ function measureAirichHtml(html, label) {
   };
 }
 
-async function sendAirichSizeTest(sock, jid, input = '') {
-  if (!sock?.relayMessage) {
-    console.log('[AIRICH-SIZE] TEST SUITE ERROR: socket sem relayMessage; impossivel enviar.');
-    return [];
-  }
+function classifyEntry(label, targetBytes, limitBytes) {
+  const html = buildSizeTestHtml(targetBytes, label);
+  const m = measureAirichHtml(html, label);
+  return {
+    label,
+    targetBytes,
+    htmlBytes: m.htmlBytes,
+    jsonBytes: m.jsonBytes,
+    base64Bytes: m.base64Bytes,
+    unifiedResponseBytes: m.unifiedResponseBytes,
+    totalEstimatedBytes: m.totalEstimatedBytes,
+    blocked: m.unifiedResponseBytes > limitBytes,
+    limitBytes
+  };
+}
 
-  const requested = parseRequestedSize(input);
-  const tests = requested
-    ? [{ label: requested.label, bytes: requested.bytes }]
-    : [...SIZE_PRESETS];
-
+async function runLiveTests(sock, jid, entries, limitBytes) {
   const results = [];
-  console.log(`[AIRICH-SIZE] TEST SUITE INICIO | testes: ${tests.map(t => t.label).join(', ')} | jid=${String(jid).slice(0, 15)}`);
+  console.log(`[AIRICH-SIZE] LIVE INICIO | testes: ${entries.map(t => t.label).join(', ')} | jid=${String(jid).slice(0, 15)} | limite=${limitBytes}`);
 
-  for (const t of tests) {
-    const displayLabel = t.label;
-    const html = buildSizeTestHtml(t.bytes, displayLabel);
-    const m = measureAirichHtml(html, displayLabel);
-
-    console.log('[AIRICH-SIZE]');
-    console.log(`label=${displayLabel}`);
-    console.log(`htmlBytes=${m.htmlBytes}`);
-    console.log(`jsonBytes=${m.jsonBytes}`);
-    console.log(`base64Bytes=${m.base64Bytes}`);
-    console.log(`unifiedResponseBytes=${m.unifiedResponseBytes}`);
-    console.log(`totalEstimatedBytes=${m.totalEstimatedBytes}`);
-
-    console.log(`[AIRICH-SIZE] SEND START ${displayLabel}`);
+  for (const m of entries) {
+    const html = buildSizeTestHtml(m.targetBytes, m.label);
+    console.log(`[AIRICH-SIZE] SEND START ${m.label}`);
     try {
-      await sendAIRichHtml(sock, jid, html, { label: `TAMANHO: ${displayLabel}`, logLabel: `airich-sizetest-${displayLabel.toLowerCase()}` });
-      console.log(`[AIRICH-SIZE] SEND DONE ${displayLabel}`);
-      results.push({ label: displayLabel, htmlBytes: m.htmlBytes, jsonBytes: m.jsonBytes, base64Bytes: m.base64Bytes, unifiedResponseBytes: m.unifiedResponseBytes, relayResult: 'OK' });
+      const res = await sendAIRichHtml(sock, jid, html, { label: `TAMANHO: ${m.label}`, logLabel: `airich-sizetest-${m.label.toLowerCase()}` });
+      const blocked = res?.blocked === 'size_limit';
+      console.log(`[AIRICH-SIZE] SEND ${blocked ? 'BLOCKED' : 'DONE'} ${m.label}`);
+      results.push({ ...m, relayResult: blocked ? 'BLOCKED (size_limit, antes do relayMessage)' : 'OK' });
     } catch (e) {
-      console.log(`[AIRICH-SIZE] SEND ERROR ${displayLabel}`);
+      console.log(`[AIRICH-SIZE] SEND ERROR ${m.label}`);
       console.log(`error=${(e && (e.stack || e.message)) || e}`);
-      results.push({ label: displayLabel, htmlBytes: m.htmlBytes, jsonBytes: m.jsonBytes, base64Bytes: m.base64Bytes, unifiedResponseBytes: m.unifiedResponseBytes, relayResult: 'ERROR: ' + ((e && e.message) || e) });
+      results.push({ ...m, relayResult: 'ERROR: ' + ((e && e.message) || e) });
     }
 
-    if (tests.length > 1) {
+    if (entries.length > 1) {
       console.log(`[AIRICH-SIZE] aguardando ${SEND_INTERVAL_MS}ms ate o proximo teste...`);
       await sleep(SEND_INTERVAL_MS);
     }
@@ -110,10 +106,58 @@ async function sendAirichSizeTest(sock, jid, input = '') {
   return results;
 }
 
+async function sendAirichSizeTest(sock, jid, input = '') {
+  if (!sock?.relayMessage) {
+    console.log('[AIRICH-SIZE] TEST SUITE ERROR: socket sem relayMessage; impossivel enviar.');
+    return [];
+  }
+
+  const tokens = String(input || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const isDry = !tokens.some(t => t === 'live' || t === 'real');
+  const sizeToken = tokens.find(t => t !== 'live' && t !== 'real' && t !== 'dry');
+  const requested = sizeToken ? parseRequestedSize(sizeToken) : null;
+  const limitBytes = getAirichSafeMaxBytes();
+
+  if (requested) {
+    const entry = classifyEntry(requested.label, requested.bytes, limitBytes);
+    console.log(`[AIRICH-SIZE] solicitado=${requested.label} | modo=${isDry ? 'DRY-RUN' : 'LIVE'} | AIRICH_SAFE_MAX_BYTES=${limitBytes}`);
+    console.log(`[AIRICH-SIZE] label=${entry.label} htmlBytes=${entry.htmlBytes} jsonBytes=${entry.jsonBytes} base64Bytes=${entry.base64Bytes} unifiedResponseBytes=${entry.unifiedResponseBytes}`);
+
+    if (entry.blocked) {
+      console.log(`[AIRICH-SIZE] BLOCKED ${entry.label}: unifiedResponseBytes (${entry.unifiedResponseBytes}) > AIRICH_SAFE_MAX_BYTES (${limitBytes}). NENHUM relayMessage sera enviado (bloqueio antes do relay).`);
+      console.log(`[AIRICH-SIZE] RESULTADO: ${entry.label} | blocked=size_limit`);
+      return [{ ...entry, relayResult: 'BLOCKED (size_limit, antes do relayMessage)' }];
+    }
+
+    if (isDry) {
+      console.log(`[AIRICH-SIZE] DRY-RUN: ${entry.label} esta DENTRO do limite e seria enviado apenas em modo live.`);
+      console.log(`[AIRICH-SIZE] Para enviar de verdade use: airichsizetest ${sizeToken} live`);
+      console.log(`[AIRICH-SIZE] RESULTADO: ${entry.label} | blocked=no (dry-run, nao enviado)`);
+      return [{ ...entry, relayResult: 'DRY-RUN (nao enviado)' }];
+    }
+
+    return await runLiveTests(sock, jid, [entry], limitBytes);
+  }
+
+  console.log(`[AIRICH-SIZE] TEST SUITE VALIDACAO (DRY-RUN) | AIRICH_SAFE_MAX_BYTES=${limitBytes}`);
+  console.log('tamanho | htmlBytes | unifiedResponseBytes | dentro_do_limite | obs');
+  const table = SIZE_PRESETS.map(t => {
+    const entry = classifyEntry(t.label, t.bytes, limitBytes);
+    const obs = entry.blocked ? 'BLOQUEADO (acima do limite)' : 'ok';
+    console.log(`${t.label} | ${entry.htmlBytes} | ${entry.unifiedResponseBytes} | ${!entry.blocked} | ${obs}`);
+    return entry;
+  });
+  console.log('[AIRICH-SIZE] DRY-RUN: nenhum relayMessage sera enviado neste modo.');
+  console.log('[AIRICH-SIZE] Para enviar um tamanho especifico real, use: airichsizetest <tamanho> live (ex: airichsizetest 1mb live).');
+  console.log('[AIRICH-SIZE] Nota: tamanhos acima do limite sao bloqueados antes do relayMessage mesmo em modo live.');
+  return table.map(e => ({ ...e, relayResult: 'DRY-RUN (nao enviado)' }));
+}
+
 export {
   MIN_HTML,
   SIZE_PRESETS,
   buildSizeTestHtml,
+  classifyEntry,
   measureAirichHtml,
   parseRequestedSize,
   sendAirichSizeTest

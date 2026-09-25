@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { buildAIRichMessageContent, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
+﻿import { readFileSync } from 'fs';
+import { buildAIRichMessageContent, checkAirichPayloadWithinLimit, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
 import { buildDoomOrientationCss, buildDoomOrientationScript } from './doom/doomOrientation.js';
 
 const JSDOS_ROOT = new URL('./doom/vendor/jsdos/', import.meta.url);
@@ -15,7 +15,15 @@ function readDoomAssetB64(relativePath) {
 }
 
 function readDoomBundleB64() {
-  return readFileSync(new URL('doom.jsdos', DOOM_ASSETS_ROOT)).toString('base64');
+  const minimal = new URL('doom-minimal.jsdos', DOOM_ASSETS_ROOT);
+  const original = new URL('doom.jsdos', DOOM_ASSETS_ROOT);
+  let bundleUrl = original;
+  try {
+    if (readFileSync(minimal, { flag: 'r' })) bundleUrl = minimal;
+  } catch (_) {
+    bundleUrl = original;
+  }
+  return readFileSync(bundleUrl).toString('base64');
 }
 
 function toJsStringLiteral(value) {
@@ -33,6 +41,10 @@ const WDOSBOX_WASM_B64 = readDoomAssetB64('wdosbox.wasm');
 
 const DOOM_WASM_PREFIX = 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/';
 const DOOM_BUNDLE_URL = 'https://cdn.dos.zone/custom/dos/doom.jsdos';
+const DOOM_TRUSTED_SOURCES = [
+  'https://cdn.jsdelivr.net',
+  'https://cdn.dos.zone'
+];
 
 const DOOM_INPUTS = [
   ['up', 'UP', 'ArrowUp', 38],
@@ -169,19 +181,19 @@ function buildDoomPlayerControlsHtml() {
   const button = (key, label, cls = '') => `<button type="button" class="${cls}" data-input="${key}" aria-label="${label}">${label}</button>`;
   return `<div class="dpad" aria-label="Direcional">
   <div class="pad-center" aria-hidden="true"></div>
-  ${button('up', '↑')}
-  ${button('left', '←')}
-  ${button('down', '↓')}
-  ${button('right', '→')}
+  ${button('up', 'â†‘')}
+  ${button('left', 'â†')}
+  ${button('down', 'â†“')}
+  ${button('right', 'â†’')}
 </div>
 <div class="actions" aria-label="Acoes">
-  ${button('strafeLeft', '◀')}
+  ${button('strafeLeft', 'â—€')}
   ${button('weapon1', '1')}
   ${button('weapon2', '2')}
   ${button('weapon3', '3')}
   ${button('weapon4', '4')}
   ${button('weapon5', '5')}
-  ${button('strafeRight', '▶')}
+  ${button('strafeRight', 'â–¶')}
   ${button('weapon6', '6')}
   ${button('weapon7', '7')}
   ${button('use', 'USE')}
@@ -223,6 +235,174 @@ __L.wdosboxJs=${wdosboxJsLiteral};
 __L.wasmB64=${wasmB64Literal};
 __L.bundleB64=${bundleB64Literal};
 __L.bundleUrl=${bundleLiteral};
+
+var __netDedup={};
+function mrk(m){if(__netDedup['M:'+m])return;__netDedup['M:'+m]=1;dbg('[DOOM-REMOTE] '+m);try{console.log('[DOOM-REMOTE] '+m)}catch(_){}}
+function __netMark(kind,phase,extra){const k=kind+'|'+phase;if(__netDedup[k])return;__netDedup[k]=1;const l='[DOOM-REMOTE] '+kind+'_'+phase+(extra?' '+extra:'');dbg(l);try{console.log(l)}catch(_){}}
+mrk('HTML_LOADED');
+const R_PREFIX=${JSON.stringify(DOOM_WASM_PREFIX)};
+const R_PROBES={WDOSBOX:String(R_PREFIX)+'wdosbox.js',WASM:String(R_PREFIX)+'wdosbox.wasm',BUNDLE:__L.bundleUrl};
+var __workerStart=0,__workerErr=false,__sawWasmReq=false,__sawWasmOk=false;
+function kindOf(url){
+  const u=String(url||'').toLowerCase();
+  if(/wdosbox\\.wasm/.test(u))return 'WASM';
+  if(/wdosbox\\.js($|[?#])/.test(u))return 'WDOSBOX';
+  if(/wlibzip\\.js/.test(u))return 'WLIBZIP';
+  if(/\\.jsdos/.test(u))return 'BUNDLE';
+  return 'OTHER';
+}
+function hookFetch(){
+  if(typeof window.fetch!=='function')return;
+  const orig=window.fetch;
+  window.fetch=function(input,init){
+    const url=typeof input==='string'?input:((input&&input.url)||'');
+    const kind=kindOf(url);
+    if(kind==='WASM'){__sawWasmReq=true}
+    if(kind!=='OTHER'){__netMark(kind,'REQUEST',url)}
+    const p=orig.apply(this,arguments);
+    if(kind!=='OTHER'){
+      p.then(function(r){
+        const code=(r&&typeof r.status==='number')?r.status:0;
+        const ok=code>0&&code<400;
+        if(kind==='WASM'&&ok){__sawWasmOk=true}
+        __netMark(kind,ok?'OK':'FAIL',url+(code?' status='+code:''));
+      },function(e){
+        const msg=(e&&(e.name?e.name+': ':'')+(e.message||''))||String(e);
+        if(kind==='OTHER'){dbg('[DOOM-REMOTE] OTHER_FAIL '+url+' '+msg)}
+        __netMark(kind,'FAIL',url+' '+msg);
+      });
+    }
+    return p;
+  };
+}
+function hookXHR(){
+  if(typeof XMLHttpRequest==='undefined')return;
+  const proto=XMLHttpRequest.prototype;
+  const open=proto.open,send=proto.send;
+  proto.open=function(m,u){this.__du=String(u||'');this.__dk=kindOf(this.__du);if(this.__dk==='WASM'){__sawWasmReq=true}if(this.__dk!=='OTHER'){__netMark(this.__dk,'REQUEST',this.__du)}return open.apply(this,arguments)};
+  proto.send=function(){
+    const self=this;
+    if(self.__dk&&self.__dk!=='OTHER'){
+      const done=function(){
+        if(self.__dxhrDone)return;self.__dxhrDone=true;
+        const st=self.status,ok=st>0&&st<400;
+        if(self.__dk==='WASM'&&ok){__sawWasmOk=true}
+        __netMark(self.__dk,ok?'OK':'FAIL',self.__du+(st?' status='+st:' status=0'));
+      };
+      const fail=function(e){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' '+(e&&e.type?e.type:'network'))};
+      const abrt=function(){if(self.__dxhrDone)return;self.__dxhrDone=true;__netMark(self.__dk,'FAIL',self.__du+' abort')};
+      self.addEventListener('load',done);
+      self.addEventListener('error',fail);
+      self.addEventListener('abort',abrt);
+    }
+    return send.apply(this,arguments);
+  };
+}
+function hookWorker(){
+  if(typeof window.Worker!=='function')return;
+  const Orig=window.Worker;
+  function W(url,opts){
+    const u=String(url||'');
+    const kind=kindOf(u);
+    if(kind==='WDOSBOX'){__workerStart=Date.now()}
+    if(kind!=='OTHER'){__netMark(kind,'REQUEST',u)}
+    const w=new Orig(url,opts);
+    if(kind==='WDOSBOX'){
+      w.addEventListener('error',function(e){__workerErr=true;__netMark('WDOSBOX','FAIL','worker error')});
+    }
+    return w;
+  }
+  W.prototype=Orig.prototype;
+  window.Worker=W;
+}
+function hookScript(){
+  try{
+    const proto=HTMLScriptElement&&HTMLScriptElement.prototype;
+    if(!proto)return;
+    const cur=Object.getOwnPropertyDescriptor(proto,'src');
+    if(!cur||!cur.set)return;
+    Object.defineProperty(proto,'src',{set:function(v){
+      const u=String(v||'');const kind=kindOf(u);
+      if(kind!=='OTHER'){__netMark(kind,'REQUEST',u)}
+      cur.set.call(this,v);
+      if(kind!=='OTHER'){
+        const el=this;
+        el.addEventListener('load',function(){__netMark(kind,'OK',u)},true);
+        el.addEventListener('error',function(){__netMark(kind,'FAIL',u+' script elem err')},true);
+      }
+    },get:cur.get});
+  }catch(_){}
+}
+function installNetDiag(){hookFetch();hookXHR();hookWorker();hookScript()}
+installNetDiag();
+function probeOne(url){
+  return new Promise(function(resolve){
+    let done=false,timer=null;
+    const fin=function(r){if(done)return;done=true;if(timer)clearTimeout(timer);resolve(r)};
+    const tryRange=function(){
+      if(typeof window.fetch==='function'){
+        const ctrl=(typeof AbortController==='function')?new AbortController():null;
+        if(ctrl)timer=setTimeout(function(){try{ctrl.abort()}catch(_){}fin({ok:false,err:'timeout (RANGE)'})},20000);
+        window.fetch(url,{method:'GET',cache:'no-store',headers:{Range:'bytes=0-0'},signal:ctrl&&ctrl.signal}).then(function(r){
+          const st=r&&typeof r.status==='number'?r.status:0;
+          if(st===0){fin({ok:false,err:'opaque/cors status 0 (RANGE)'})}
+          else{fin({ok:st<400,status:st,via:'RANGE'})}
+        },function(e){fin({ok:false,err:(((e&&e.name)?e.name+': ':'')+((e&&e.message)||''))||String(e)+' (RANGE)'})});
+      }else{
+        try{
+          const x=new XMLHttpRequest();
+          x.open('GET',url,true);x.timeout=20000;
+          x.setRequestHeader('Range','bytes=0-0');
+          let sett=false;
+          x.onreadystatechange=function(){if(x.readyState===4&&!sett){sett=true;const st=x.status;fin({ok:st>0&&st<400,status:st,via:'XHR-RANGE'})}};
+          x.onerror=function(){if(!sett){sett=true;fin({ok:false,err:'xhr network (RANGE)'})}};
+          x.send(null);
+        }catch(e){fin({ok:false,err:'xhr '+((e&&e.message)||e)})}
+      }
+    };
+    const tryHead=function(){
+      if(typeof window.fetch==='function'){
+        const ctrl=(typeof AbortController==='function')?new AbortController():null;
+        if(ctrl)timer=setTimeout(function(){try{ctrl.abort()}catch(_){}fin({ok:false,err:'timeout (HEAD)'})},15000);
+        window.fetch(url,{method:'HEAD',cache:'no-store',signal:ctrl&&ctrl.signal}).then(function(r){
+          const st=r&&typeof r.status==='number'?r.status:0;
+          if(st===0){fin({ok:false,err:'opaque/cors status 0 (HEAD)'})}
+          else if(st===405||st===501){tryRange()}
+          else{fin({ok:st<400,status:st,via:'HEAD'})}
+        },function(e){
+          const msg=(((e&&e.name)?e.name+': ':'')+((e&&e.message)||''))||String(e);
+          if(/405|not.?allowed|range/i.test(msg)){tryRange();return}
+          fin({ok:false,err:msg+' (HEAD)'});
+        });
+      }else{
+        try{
+          const x=new XMLHttpRequest();
+          x.open('HEAD',url,true);x.timeout=15000;
+          let sett=false;
+          x.onreadystatechange=function(){if(x.readyState===4&&!sett){sett=true;const st=x.status;fin({ok:st>0&&st<400,status:st,via:'XHR-HEAD'})}};
+          x.onerror=function(){if(!sett){sett=true;fin({ok:false,err:'xhr network (HEAD)'})}};
+          x.send(null);
+        }catch(e){fin({ok:false,err:'xhr '+((e&&e.message)||e)})}
+      }
+    };
+    tryHead();
+  });
+}
+function runNetCheck(){
+  const names=['WDOSBOX','WASM','BUNDLE'];
+  let failed=[],n=0;
+  return new Promise(function(resolve){
+    names.forEach(function(name){
+      probeOne(R_PROBES[name]).then(function(info){
+        dbg('[DOOM-REMOTE] PROBE '+name+' '+(info.ok?'OK':'FAIL')+' ('+R_PROBES[name]+')'+(info.status?(' status='+info.status):'')+(info.via?(' via '+info.via):'')+(info.err?(' '+info.err):''));
+        try{console.log('[DOOM-REMOTE] PROBE '+name+' '+(info.ok?'OK':'FAIL')+' ('+R_PROBES[name]+')')}catch(_){}
+        if(!info.ok)failed.push(name);
+        n+=1;
+        if(n===names.length)resolve({ok:failed.length===0,failed:failed});
+      });
+    });
+  });
+}
 
 function pad2(v){v=String(v);return v.length<2?'0'+v:v}
 function dbg(msg){
@@ -393,41 +573,67 @@ if(__L.embedded&&typeof OrigFetch==='function'){
 }
 
 let finished=false;
+var __runResolved=false,__canvasSeen=false,__gameMark=false;
 function startDoom(){
+  mrk('JS_DOS_LOADING');
   setStatus('Iniciando DOOM...','');
   if(typeof Dos==='undefined'){setStatus('js-dos nao carregou','error');dbg('ERRO: global Dos ausente - js-dos.js nao executou?');return}
-  dbg('[TEMP-DIAG] js-dos carregado: Dos='+(typeof Dos)+' | window.emulators='+(typeof window.emulators)+' | botao layout ok');
+  mrk('JS_DOS_LOADED');
   try{
     window.emulators=window.emulators||{};
     window.emulators.pathPrefix='${DOOM_WASM_PREFIX}';
-    dbg('Etapa 1: js-dos carregado; pathPrefix='+window.emulators.pathPrefix);
-    dbg('Etapa 2: '+(__L.wasmBytes?'wdosbox.js/.wasm LOCAIS':'wdosbox via rede')+' ; bundle '+(__L.bundleBytes?'LOCAL ('+Math.round((__L.bundleBytes.length/1048576)*10)/10+' MB)':'remoto')+': '+__L.bundleUrl);
-    if(__L.bundleBytes&&__L.bundleBytes.length>5242880){dbg('AVISO: bundle embutido gera payload ~'+Math.round((2.7+(__L.bundleB64?__L.bundleB64.length:0)/1048576)*10)/10+' MB; se o HTML chegar truncado, o jogo nao inicia')}
-    setStatus('Baixando o jogo...','');
-    const t0=Date.now();
-    var pollN=0;
-    var poll=setInterval(function(){
-      if(++pollN>120){clearInterval(poll);return}
-      if(typeof window.WDOSBOX==='function'){if(!__wd){__wd=1;dbg('[TEMP-DIAG] window.WDOSBOX disponivel')}}
-      if(typeof window.WLIBZIP==='function'){if(!__wl){__wl=1;dbg('[TEMP-DIAG] window.WLIBZIP disponivel')}}
-      var lm=document.querySelector('.emulator-js-loading-message, .loading-message, .jsdos-loading, .loading-label');
-      if(lm&&lm.textContent){var tt=String(lm.textContent).trim();if(tt&&tt!==__lastMsg){__lastMsg=tt;dbg('[TEMP-DIAG] js-dos msg: '+tt)}}
-    },500);
-    const watchdog=setTimeout(function(){
-      if(!finished){finished=true;clearTimeout(watchdog);setStatus('Timeout '+Math.round((Date.now()-t0)/1000)+'s (rede/wasm?)','error');dbg('TIMEOUT em '+((Date.now()-t0)/1000).toFixed(1)+'s - demorou mais de 60s')}
-    },60000);
-    dbg('Etapa 3: Dos(dosbox,{emulatorFunction:'+emuFn+'}).run('+__L.bundleUrl+')');
+    dbg('pathPrefix='+window.emulators.pathPrefix+' | modo='+(__L.embedded?'EMBUTIDO':'REMOTO')+' | bundle='+__L.bundleUrl);
+    setStatus('Verificando rede e trusted_sources...','');
+    runNetCheck().then(function(res){
+      dbg('[DOOM-REMOTE] NETCHECK '+(res.ok?'OK':'FAIL')+(res.failed.length?(' -> '+res.failed.join(',')):''));
+      if(!res.ok){
+        setStatus('Rede/trusted_sources impediram: '+res.failed.join(','),'error');
+        dbg('[DOOM-REMOTE] Jogo NAO iniciado de proposito (falha de rede/trusted_sources). Markers D-H nao aplicaveis ainda.');
+        return;
+      }
+      bootDoom();
+    });
+  }catch(e){setStatus('Erro: '+((e&&e.message)||String(e)),'error');dbg('Erro sincrono: '+((e&&e.message)||String(e)))}
+}
+function bootDoom(){
+  const t0=Date.now();
+  var pollN=0,wdOK=0;
+  var poll=setInterval(function(){
+    if(++pollN>360){clearInterval(poll);return}
+    if(typeof window.WDOSBOX==='function'){if(!wdOK){wdOK=1;__netMark('WDOSBOX','OK','script carregou (window.WDOSBOX)')}}
+    var lm=document.querySelector('.emulator-js-loading-message, .loading-message, .jsdos-loading, .loading-label');
+    if(lm&&lm.textContent){var tt=String(lm.textContent).trim();if(tt&&tt!==__lastMsg){__lastMsg=tt;dbg('js-dos msg: '+tt)}}
+    if(__workerStart&&!__workerErr){
+      if(Date.now()-__workerStart>1000&&!__sawWasmReq){__sawWasmReq=true;mrk('WASM_REQUEST');dbg('WASM_REQUEST (inferido: dentro do Worker, nao visivel da thread principal)')}
+      if(Date.now()-__workerStart>5000&&!__sawWasmOk){__sawWasmOk=true;mrk('WASM_OK');dbg('WASM_OK (inferido: Worker vivo 5s sem erro de rede)')}
+    }
+    var cv=document.querySelector('#dosbox canvas');
+    if(cv){
+      if(!__canvasSeen){__canvasSeen=true;mrk('CANVAS_READY');dbg('canvas em #dosbox: '+cv.width+'x'+cv.height)}
+      if(cv.width>0&&cv.height>0&&!__gameMark&&!__runResolved){__gameMark=true;mrk('GAME_STARTED');dbg('canvas com tamanho real (jogo renderizando)')}
+    }
+    if(__runResolved&&!__gameMark){__gameMark=true;mrk('GAME_STARTED');dbg('run() resolveu (sessao de jogo ativa)')}
+  },250);
+  const watchdog=setTimeout(function(){
+    if(!finished){finished=true;clearInterval(poll);setStatus('Timeout '+Math.round((Date.now()-t0)/1000)+'s (rede/wasm?)','error');dbg('[DOOM-REMOTE] TIMEOUT em '+((Date.now()-t0)/1000).toFixed(1)+'s (90s sem progresso)')}
+  },90000);
+  try{
+    setStatus('Criando Dos()...','');
     const __di=Dos(dosbox,{emulatorFunction:emuFn});
-    dbg('[TEMP-DIAG] Dos() instanciado; chamando run()...');
+    mrk('DOS_CREATED');
+    setStatus('Baixando o jogo...','');
+    mrk('DOS_RUN');
     __di.run(__L.bundleUrl).then(function(){
-      if(!finished){finished=true;clearTimeout(watchdog);setStatus('DOOM pronto','ready');dbg('DOOM inicializado em '+((Date.now()-t0)/1000).toFixed(1)+'s')}
+      __runResolved=true;
+      if(!finished){finished=true;clearTimeout(watchdog);clearInterval(poll);setStatus('DOOM pronto','ready');dbg('DOOM inicializado em '+((Date.now()-t0)/1000).toFixed(1)+'s')}
+      mrk('GAME_STARTED');
     }).catch(function(e){
-      if(!finished){finished=true;clearTimeout(watchdog)}
+      if(!finished){finished=true;clearTimeout(watchdog);clearInterval(poll)}
       const msg=(e&&e.name?e.name+': ':'')+(e&&e.message?e.message:String(e));
       setStatus('Erro: '+msg,'error');
-      dbg('FALHA em run(): '+msg);
+      dbg('[DOOM-REMOTE] FALHA em run(): '+msg);
       if(e&&e.stack){try{dbg('stack: '+String(e.stack).split('\\n').slice(0,5).join(' ~ '))}catch(_){}}
-      if(/network|download|fetch|xhr/i.test(String(e&&e.message))){dbg('Dica: rede externa bloqueada? use embedBundle=true para embutir o bundle')}
+      if(/network|download|fetch|xhr|cors/i.test(String(e&&e.message))){dbg('[DOOM-REMOTE] Dica: rede externa/trusted_sources podem estar bloqueando os CDNs')}
     });
   }catch(e){setStatus('Erro: '+((e&&e.message)||String(e)),'error');dbg('Erro sincrono: '+((e&&e.message)||String(e)))}
 }
@@ -467,10 +673,26 @@ function normalizeDoomBundleUrl(bundleUrl = '') {
   return trimmed;
 }
 
-async function sendDoomRichHtml(sock, jid, label, html) {
+async function sendDoomRichHtml(sock, jid, label, html, trustedSources = []) {
   if (!sock?.relayMessage) throw new Error('Socket sem relayMessage; nao e possivel enviar AIRich manual.');
-  const richContent = buildAIRichMessageContent(html, { label });
-  logAirichPayloadStats(label.toLowerCase().replace(/\\s+/g, ''), html, richContent);
+  const richContent = buildAIRichMessageContent(html, { label, trustedSources });
+  const check = checkAirichPayloadWithinLimit(html, richContent);
+  if (!check.ok) {
+    console.log(`[${label}] htmlBytes=${check.metrics.htmlBytes}`);
+    console.log(`[${label}] base64Bytes=${check.metrics.base64Bytes}`);
+    console.log(`[${label}] jsonBytes=${check.metrics.jsonBytes}`);
+    console.log(`[${label}] unifiedResponseBytes=${check.metrics.unifiedResponseBytes}`);
+    console.log(`[DOOM] Payload bloqueado por limite AIRich: unifiedResponseBytes (${check.metrics.unifiedResponseBytes}) > AIRICH_SAFE_MAX_BYTES (${check.limitBytes}). Nenhum relayMessage enviado (sem retry, sem queda de socket, sem remoÃ§Ã£o de sessÃ£o).`);
+    return {
+      ok: false,
+      blocked: 'size_limit',
+      reason: `unifiedResponseBytes (${check.metrics.unifiedResponseBytes}) > AIRICH_SAFE_MAX_BYTES (${check.limitBytes})`,
+      limitBytes: check.limitBytes,
+      metrics: check.metrics,
+      relayResult: 'BLOCKED'
+    };
+  }
+  logAirichPayloadStats(label.toLowerCase().replace(/\s+/g, ''), html, richContent);
   console.log(`[${label}] Enviando botForwardedMessage.richResponseMessage...`);
   return sock.relayMessage(jid, richContent, { messageId: createId() });
 }
@@ -480,10 +702,14 @@ function sendDoomInputTest(sock, jid) {
 }
 
 function sendDoomExperimental(sock, jid, bundleUrl = '', opts) {
-  return sendDoomRichHtml(sock, jid, 'DOOM', buildDoomPlayerHtml(bundleUrl, opts));
+  const remoteOpts = { embedWdosbox: false, embedBundle: false, ...(opts || {}) };
+  const url = bundleUrl ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
+  const html = buildDoomPlayerHtml(url, remoteOpts);
+  const trustedSources = remoteOpts.embedWdosbox || remoteOpts.embedBundle ? [] : [...DOOM_TRUSTED_SOURCES];
+  return sendDoomRichHtml(sock, jid, 'DOOM', html, trustedSources);
 }
 
-export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
+export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_TRUSTED_SOURCES, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
 
 const buildDoomExperimentalHtml = buildDoomPlayerHtml;
 export { buildDoomExperimentalHtml };
