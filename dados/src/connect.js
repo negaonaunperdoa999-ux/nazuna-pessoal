@@ -52,6 +52,7 @@ class MessageQueue {
     }
 
     async add(message, processor) {
+        try { console.log(`[TEMP-DIAG C3] queue.add id=${message?.key?.id?.slice(-6) || 'no-key'} jid=${message?.key?.remoteJid || 'n/a'} isProcessing=${this.isProcessing} qlen=${this.queue.length}`); } catch (e) {}
         return new Promise((resolve, reject) => {
             this.queue.push({
                 message,
@@ -150,9 +151,11 @@ class MessageQueue {
 
     async processItem(item) {
         const { message, processor, resolve } = item;
+        try { console.log(`[TEMP-DIAG C4] processItem start id=${message?.key?.id?.slice(-6) || item.id} t=${Date.now()}`); } catch (e) {}
 
         try {
             const result = await processor(message);
+            try { console.log(`[TEMP-DIAG C4b] processItem done id=${message?.key?.id?.slice(-6) || item.id}`); } catch (e) {}
             resolve(result);
             return result;
         } catch (error) {
@@ -1482,6 +1485,7 @@ async function createBotSocket(authDir) {
         messageQueue.setErrorHandler(queueErrorHandler);
 
         const processMessage = async (info) => {
+            try { console.log(`[TEMP-DIAG C5] processMessage entry id=${info?.key?.id?.slice(-6) || 'n/a'} jid=${info?.key?.remoteJid || 'n/a'} type=${Object.keys(info?.message || {}).join(',')}`); } catch (e) {}
 
             const isJoinRequest = info?.messageStubType === 172;
 
@@ -1507,6 +1511,7 @@ async function createBotSocket(authDir) {
 
 
             if (typeof indexModule === 'function') {
+                try { console.log(`[TEMP-DIAG C5b] chamando indexModule`); } catch (e) {}
                 await indexModule(NazunaSock, info, null, messagesCache, rentalExpirationManager);
             } else {
                 throw new Error('Módulo index.js não é uma função válida. Verifique o arquivo index.js.');
@@ -1518,6 +1523,7 @@ async function createBotSocket(authDir) {
             messagesListenerAttached = true;
 
             NazunaSock.ev.on('messages.upsert', async (m) => {
+                try { console.log(`[TEMP-DIAG C1] messages.upsert type=${m.type} count=${Array.isArray(m.messages) ? m.messages.length : 0} first=${m.messages?.[0]?.key?.id?.slice(-6) || 'n/a'} jid=${m.messages?.[0]?.key?.remoteJid || 'n/a'}`); } catch (e) {}
                 if (!m.messages || !Array.isArray(m.messages)) return;
 
 
@@ -1528,6 +1534,7 @@ async function createBotSocket(authDir) {
 
 
                 if (m.type !== 'notify' && m.type !== 'append') return;
+                try { console.log(`[TEMP-DIAG C2] filtros upsert OK type=${m.type} msgs=${m.messages.length} ids=${m.messages.map(i => i.key?.id?.slice(-6) || '?').join(',')}`); } catch (e) {}
 
                 try {
 

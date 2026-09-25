@@ -992,6 +992,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
   // Log de início de processamento para debug paralelo
   const msgId = info?.key?.id?.slice(-6) || 'unknown';
   const from = info?.key?.remoteJid || 'unknown';
+  try { console.log(`[TEMP-DIAG C6] NazuninhaBotExec ENTRY id=${msgId} jid=${from} hasMsg=${!!info?.message} fromMe=${!!info?.key?.fromMe}`); } catch (e) {}
 
   let config = loadJsonFile(CONFIG_FILE, {});
   ensureDatabaseIntegrity({ log: Boolean(config?.debug) });
@@ -1615,6 +1616,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     var r;
     const from = info.key.remoteJid;
     const isGroup = from?.endsWith('@g.us') || false;
+    try { console.log(`[TEMP-DIAG C6b] key participant=${info.key.participant} jid=${info.key.remoteJid} fromMe=${info.key.fromMe}`); } catch (e) {}
     if (!info.key.participant && !info.key.remoteJid) return;
     let sender;
     if (isGroup) {
@@ -1652,6 +1654,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     // Se sender ainda for undefined, ignora a mensagem (ex: mensagens de sistema, stubs, etc)
     if (!sender) {
       debugLog('Sender não identificado, ignorando mensagem');
+      console.log(`[TEMP-DIAG C7] DESCARTADO: sender nao identificado id=${msgId}`);
       return;
     }
 
@@ -1792,6 +1795,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       return message.conversation || message.extendedTextMessage?.text || message.imageMessage?.caption || message.videoMessage?.caption || message.documentWithCaptionMessage?.message?.documentMessage?.caption || message.viewOnceMessage?.message?.imageMessage?.caption || message.viewOnceMessage?.message?.videoMessage?.caption || message.viewOnceMessageV2?.message?.imageMessage?.caption || message.viewOnceMessageV2?.message?.videoMessage?.caption || message.editedMessage?.message?.protocolMessage?.editedMessage?.extendedTextMessage?.text || message.editedMessage?.message?.protocolMessage?.editedMessage?.imageMessage?.caption || '';
     };
     const body = getMessageText(info.message) || info?.text || '';
+    try { console.log(`[TEMP-DIAG C8] body extraida id=${msgId} len=${body.length} tipom=${Object.keys(info?.message || {}).join(',')} body="${body.trim().slice(0, 40)}"`); } catch (e) {}
     // ==================== INICIAR ====================
     startAutoAcceptSystem(nazu, from);
 
@@ -2106,6 +2110,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       args.push(...newArgs);
       q = newArgs.join(' ');
     }
+    try { console.log(`[TEMP-DIAG C9] comando=${command} isCmd=${isCmd} prefix="${groupPrefix}" body="${body.trim().slice(0, 30)}"`); } catch (e) {}
 
     const isPremium = premiumListaZinha[sender] || premiumListaZinha[from] || isOwner;
 
@@ -4638,7 +4643,10 @@ const getFileBuffer = async (mediakey, mediaType, options = {}) => {
     }
 
     const botStateFile = pathz.join(DATABASE_DIR, 'botState.json');
-    if (botState.status === 'off' && !isOwner) return;
+    if (botState.status === 'off' && !isOwner) {
+      console.log(`[TEMP-DIAG C9b] DESCARTADO: botState off (nao dono) cmd=${command}`);
+      return;
+    }
     if (botState.viewMessages) nazu.readMessages([info.key]);
     try {
       if (budy2 && budy2.length > 1) {
@@ -5782,6 +5790,7 @@ Entre em contato com o dono do bot:
         console.error('Erro ao verificar lista de comandos de subdonos:', e);
       }
     }
+    try { console.log(`[TEMP-DIAG C10] DISPATCHER cmd=${command} jid=${from?.slice(0, 16)}`); } catch (e) {}
 
 
     switch (command) {
