@@ -164,6 +164,7 @@ import { sendAirichProbe } from './funcs/private/airich/airichProbe.js';
 import { sendAIRichHtml } from './funcs/private/airich/sendAIRichHtml.js';
 import { sendDoomExperimental, sendDoomInputTest } from './funcs/private/doomRichHtml.js';
 import { sendGbaTest } from './funcs/private/gba/gbaTestHtml.js';
+import { sendAirichSizeTest } from './funcs/private/airich/airichSizeTest.js';
 import { getInfo as gdriveGetInfo } from './funcs/utils/gdrive.js';
 import { getInfo as mediafireGetInfo } from './funcs/utils/mediafire.js';
 import { getInfo as twitterGetInfo } from './funcs/utils/twitter.js';
@@ -5853,6 +5854,16 @@ Entre em contato com o dono do bot:
         } catch (e) {
           console.error('[airichprobe] Erro final ao processar comando:', e);
           await reply('Falha ao enviar o probe AIRich. Veja o console do bot para o ponto exato do erro.');
+        }
+        break;
+      }
+
+      case 'airichsizetest': {
+        try {
+          await sendAirichSizeTest(nazu, from, q);
+        } catch (e) {
+          console.error('[airichsizetest] Erro final ao processar comando:', e);
+          await reply('Falha ao executar AIRich Size Test. Veja o console do bot para detalhes.');
         }
         break;
       }
