@@ -1203,11 +1203,243 @@ async function sendDoomRichHtml(sock, jid, label, html, trustedSources = [], url
   return sock.relayMessage(jid, richContent, { messageId: createId() });
 }
 
+const DOOM_MINIMAL_TSS = ['https://cdn.jsdelivr.net'];
+const DOOM_DIAG_VARIANTS = [
+  { v: 'A', url: '', ts: DOOM_MINIMAL_TSS },
+  { v: 'B', url: 'https://cdn.jsdelivr.net', ts: DOOM_MINIMAL_TSS },
+  { v: 'C', url: 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/', ts: DOOM_MINIMAL_TSS },
+  { v: 'D', url: 'https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/', ts: [...DOOM_TRUSTED_SOURCES] }
+];
+
+function parseDoomDiagCommand(q) {
+  let raw = String(q || '').trim();
+  if (!raw) return null;
+  let low = raw.toLowerCase().replace(/^doon\s+/, '');
+  if (low !== 'diag' && low.indexOf('diag') !== 0) return null;
+  const parts = low.split(/[\s:,.-]+/).filter(Boolean);
+  const set = new Set(parts.slice(1).map((p) => p.toLowerCase()));
+  if (set.has('mini')) return { mini: true, variants: [...DOOM_DIAG_VARIANTS] };
+  if (set.has('all') || set.has('d')) return { mini: false, variants: [DOOM_DIAG_VARIANTS[3]] };
+  const chosen = DOOM_DIAG_VARIANTS.filter((x) => x.v === 'A' || x.v === 'B' || x.v === 'C').filter((x) => set.has(x.v.toLowerCase()));
+  return { mini: false, variants: chosen.length ? chosen : [DOOM_DIAG_VARIANTS[0], DOOM_DIAG_VARIANTS[1], DOOM_DIAG_VARIANTS[2]] };
+}
+
+function buildOriginTestHtml(v) {
+  const bundle = DOOM_BUNDLE_URL;
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#101820;color:#fff;font:12px monospace;padding:10px">'
+    + '<h2 style="color:#ffcb05;margin:0 0 8px;font:800 15px Arial">Origin Test ' + v.v + '</h2>'
+    + '<div id="origin">carregando...</div><div id="xhr">carregando...</div><div id="fetch">carregando...</div><div id="bundle">carregando...</div><div id="wdosbox">carregando...</div><div id="wasm">carregando...</div>'
+    + '<script>'
+    + '(function(){'
+    + 'var out=function(id,t){var el=document.getElementById(id);if(el)el.textContent=t;try{console.log("[AIRICH_MINI] "+t)}catch(_){ }};'
+    + 'var href="",origin="",base="",ua="";'
+    + 'try{href=String(location.href||"")}catch(_){ }'
+    + 'try{origin=String(location.origin||"")}catch(_){ }'
+    + 'try{base=String(document.baseURI||"")}catch(_){ }'
+    + 'try{ua=String(navigator.userAgent||"")}catch(_){ }'
+    + 'out("origin","AIRICH_URL_FIELD=' + JSON.stringify(v.url) + ' | ORIGIN="+(origin||"(null)")+(origin==="null"?" (OBS: opaque/null)":"")+" | href="+(href||"(none)")+" | base="+(base||"(none)")+" | mini-ua="+(ua.slice(0,80)||"-"));'
+    + 'var SMALL="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js";'
+    + 'var WD="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.js";'
+    + 'var WSM="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.wasm";'
+    + 'var BDL=' + JSON.stringify(bundle) + ';'
+    + 'var xh=function(u,m,id){'
+    + '  try{'
+    + '    var x=new XMLHttpRequest();'
+    + '    x.open(m||"GET",u,true);'
+    + '    try{x.responseType="arraybuffer"}catch(_){ }'
+    + '    x.timeout=25000;'
+    + '    var done=false;'
+    + '    var fin=function(t){if(done)return;done=true;out(id,t)};'
+    + '    x.onreadystatechange=function(){if(x.readyState===4){var st="";try{st=String(x.status)}catch(_){ }var ru="";try{ru=String(x.responseURL||"")}catch(_){ }var stt="";try{stt=String(x.statusText||"")}catch(_){ }fin("status="+st+" stt="+(stt||"-")+" respURL="+(ru||"(none)")+(st==="0"?" (possivel CORS ou bloqueio)":""))}};'
+    + '    x.onerror=function(){fin("onerror status="+x.status+" (network/CORS)")};'
+    + '    x.onabort=function(){fin("onabort")};'
+    + '    x.ontimeout=function(){fin("timeout")};'
+    + '    x.send(null);'
+    + '  }catch(e){out(id,"ex "+String(e&&e.message||e))}'
+    + '};'
+    + 'var fe=function(u,id,extra){'
+    + '  if(typeof window.fetch!=="function"){out(id,"no-fetch-api");return}'
+    + '  var opts=extra||{};var ctrl=null;try{if(typeof AbortController==="function")ctrl=new AbortController()}catch(_){ }'
+    + '  if(ctrl){opts={};for(var k in (extra||{}))opts[k]=extra[k];opts.signal=ctrl.signal;setTimeout(function(){try{ctrl.abort()}catch(_){ }out(id,"timeout")},25000)}'
+    + '  try{'
+    + '    window.fetch(u,opts).then(function(r){'
+    + '      var acao="";try{acao=String(r.headers&&typeof r.headers.get==="function"?r.headers.get("access-control-allow-origin")||"":"")}catch(_){ }'
+    + '      out(id,"ok="+(r.ok?"true":"false")+" type="+(r.type||"-")+" status="+r.status+" url="+(r.url||"(none)")+(acao?" acao="+acao:""));'
+    + '    },function(e){out(id,"err "+String(e&&e.message||e))});'
+    + '  }catch(e){out(id,"ex "+String(e&&e.message||e))}'
+    + '};'
+    + 'setTimeout(function(){'
+    + '  xh(SMALL,"GET","xhr");'
+    + '  fe(SMALL,"fetch");'
+    + '  xh(BDL,"HEAD","bundle");'
+    + '  xh(WD,"HEAD","wdosbox");'
+    + '  xh(WSM,"HEAD","wasm");'
+    + '  fe(BDL,"fetchHead",{method:"HEAD"});'
+    + '  try{fe(BDL,"fetchNoCors",{method:"HEAD",mode:"no-cors"})}catch(_){ }'
+    + '},400);'
+    + 'try{console.log("[AIRICH_URL_TEST] mini variant=" + ' + JSON.stringify(v.v) + ')}catch(_){ }'
+    + '})();'
+    + '</script></body></html>';
+}
+
+const AIRICH_DIAG_SNIP = `
+var __WVD={v:@V@,url:@URL@,rt:@RT@,ts:@TS@,bundle:@BUNDLE@,small:"https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js",wdjs:"https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.js",wasm:"https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.wasm",pkg:"https://cdn.jsdelivr.net/gh/negaonaunperdoa999-ux/nazuna-pessoal@main/package.json"};
+var __wvdLines=0;
+var __wvdPanel=function(){
+  try{
+    var box=document.createElement("section");
+    box.id="airichNetDiag";
+    box.style.cssText="margin:8px;padding:8px;border:1px solid #3b5361;border-radius:8px;background:#071018;color:#cfe1ec;font:11px/1.45 monospace;max-height:62vh;overflow:auto";
+    var h=document.createElement("div");
+    h.style.cssText="font-weight:800;color:#ffcb05;padding-bottom:6px";
+    h.textContent="AIRICH NETWORK DIAG (variante "+__WVD.v+")   url="+(__WVD.url&&__WVD.url.length?__WVD.url:"(ausente/omitido)");
+    box.appendChild(h);
+    try{(document.body||document.documentElement).appendChild(box)}catch(_){ }
+    window.__wvdElem=box;
+    window.__wvdAdd=function(line){try{var d=document.createElement("div");d.textContent=line;box.appendChild(d);box.scrollTop=box.scrollHeight}catch(_){ }};
+  }catch(_){ }
+};
+var __wvdLog=function(m,d){
+  var txt="[AIRICH] "+m+" "+(d||"");
+  try{console.log(txt)}catch(_){ }
+  try{if(window.__wvdAdd)__wvdAdd(m+" -> "+(d||""))}catch(_){ }
+};
+var __wvdRun=function(){
+  if(typeof XMLHttpRequest!=="function")return;
+  try{__wvdLog("AIRICH_URL_TEST","variant="+__WVD.v)}catch(_){ }
+  try{__wvdLog("AIRICH_URL_FIELD",(__WVD.url&&__WVD.url.length?__WVD.url:"(ausente/omitido)"))}catch(_){ }
+  var href="",origin="",base="";
+  try{href=String(location.href||"")}catch(_){ }
+  try{origin=String(location.origin||"")}catch(_){ }
+  try{base=String(document.baseURI||"")}catch(_){ }
+  __wvdLog("AIRICH_LOCATION_HREF",(href||"(none)"));
+  __wvdLog("AIRICH_LOCATION_ORIGIN",(origin||"(none)")+(origin==="null"?"  <= OPAQUE/NULL (sem origem https)":(origin?"  (origem HTTPS visivel)":"")));
+  __wvdLog("AIRICH_BASE_URI",(base||"(none)"));
+  __wvdLog("AIRICH_RUNTIME_HTML",(__WVD.rt&&__WVD.rt.length?__WVD.rt:"(none)"));
+  try{__wvdPanel()}catch(_){ }
+  var xg=function(url,head,tout){
+    return new Promise(function(res){
+      var x=null;try{x=new XMLHttpRequest()}catch(e){res({err:"no-xhr",st:0});return}
+      var done=false,t=null;
+      var fin=function(o){if(done)return;done=true;if(t)clearTimeout(t);res(o)};
+      try{
+        x.open(head?"HEAD":"GET",url,true);
+        try{x.timeout=tout}catch(_){ }
+        try{x.responseType="arraybuffer"}catch(_){ }
+        x.onreadystatechange=function(){
+          if(x.readyState===4){
+            var st=0,ru="",stt="",sz=-1;
+            try{st=x.status}catch(_){ }
+            try{ru=String(x.responseURL||"")}catch(_){ }
+            try{stt=String(x.statusText||"")}catch(_){ }
+            try{sz=(x.response&&x.response.byteLength?x.response.byteLength:-1)}catch(_){ }
+            fin({st:st,stt:stt,ru:ru,sz:sz,head:head});
+          }
+        };
+        x.onerror=function(){fin({err:"onerror",st:0})};
+        x.onabort=function(){fin({err:"onabort",st:0})};
+        x.ontimeout=function(){fin({err:"timeout",st:0})};
+        x.send(null);
+      }catch(e){fin({err:String(e&&e.message||e),st:0})}
+    });
+  };
+  var fg=function(url,init){
+    return new Promise(function(res){
+      if(typeof window.fetch!=="function"){res({err:"no-fetch",st:0,ty:""});return}
+      var ctrl=null,timer=null;
+      try{if(typeof AbortController==="function")ctrl=new AbortController()}catch(_){ }
+      if(ctrl)timer=setTimeout(function(){try{ctrl.abort()}catch(_){ }res({err:"timeout",st:0})},25000);
+      var opt={};
+      for(var k in (init||{}))opt[k]=init[k];
+      if(ctrl)opt.signal=ctrl.signal;
+      try{
+        window.fetch(url,opt).then(function(r){
+          if(timer)clearTimeout(timer);
+          var acao="";try{acao=String(r.headers&&typeof r.headers.get==="function"?r.headers.get("access-control-allow-origin")||"":"")}catch(_){ }
+          res({ok:r.ok,st:r.status,ty:String(r.type||""),ru:String(r.url||""),acao:acao});
+        },function(e){if(timer)clearTimeout(timer);res({err:String(e&&e.message||e),st:0})});
+      }catch(e){if(timer)clearTimeout(timer);res({err:String(e&&e.message||e),st:0})}
+    });
+  };
+  var fd=function(r){
+    if(r.err)return "err="+r.err+(r.st?" status="+r.st:"");
+    var p="status="+r.st;
+    if(r.stt)p+=" stt="+(r.stt||"-");
+    if(r.ty)p+=" type="+r.ty;
+    if(typeof r.ok==="boolean")p+=" ok="+(r.ok?"true":"false");
+    if(r.ru)p+=" respURL="+r.ru;
+    if(r.acao)p+=" acao="+r.acao;
+    if(r.sz>=0)p+=" bytes="+r.sz;
+    if(r.head)p+=" (HEAD, sem corpo)";
+    return p;
+  };
+  var steps=[
+    {m:"AIRICH_XHR_JSDOS",run:function(){return xg(__WVD.small,false,25000)}},
+    {m:"AIRICH_FETCH_JSDOS",run:function(){return fg(__WVD.small,{})}},
+    {m:"AIRICH_XHR_WDJS_HEAD",run:function(){return xg(__WVD.wdjs,true,20000)}},
+    {m:"AIRICH_XHR_WASM_HEAD",run:function(){return xg(__WVD.wasm,true,20000)}},
+    {m:"AIRICH_XHR_BUNDLE_HEAD",run:function(){return xg(__WVD.bundle,true,25000)}},
+    {m:"AIRICH_FETCH_BUNDLE_HEAD",run:function(){return fg(__WVD.bundle,{method:"HEAD"})}},
+    {m:"AIRICH_FETCH_BUNDLE_NOCORS_HEAD",run:function(){return fg(__WVD.bundle,{method:"HEAD",mode:"no-cors"})}},
+    {m:"AIRICH_XHR_SMALL_SAMEDOMAIN",run:function(){return xg(__WVD.pkg,false,15000)}},
+    {m:"AIRICH_FETCH_SMALL_SAMEDOMAIN",run:function(){return fg(__WVD.pkg,{})}}
+  ];
+  var chain=Promise.resolve();
+  for(var i=0;i<steps.length;i++){
+    (function(s){
+      chain=chain.then(function(){return s.run()}).then(function(r){__wvdLog(s.m,fd(r))}).catch(function(e){__wvdLog(s.m,"ex "+String(e&&e.message||e))});
+    })(steps[i]);
+  }
+  chain=chain.then(function(){try{console.log("[AIRICH_URL_TEST] DONE variant="+__WVD.v)}catch(e){ }});
+};
+window.setTimeout(function(){try{if(typeof XMLHttpRequest!=="function")return;__wvdPanel();__wvdRun()}catch(e){try{console.log("[AIRICH_URL_TEST] ex "+String(e&&e.message||e))}catch(_){ }}},500);
+`;
+
+function buildAirichDiagHtml(html, v) {
+  let out = String(html || '');
+  try {
+    out = out.replace("setTimeout(runNetCompare,1000);", "/* diag: runNetCompare desligado neste card (evita novo download de 5.5MB apos o boot) */");
+    out = out.replace("if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()}", "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()}");
+  } catch (_) {}
+  const tail = out.lastIndexOf('</script></body></html>');
+  const code = AIRICH_DIAG_SNIP
+    .split('@V@').join(JSON.stringify(v.v))
+    .split('@URL@').join(JSON.stringify(v.url))
+    .split('@RT@').join(JSON.stringify(DOOM_RUNTIME_URL))
+    .split('@TS@').join(JSON.stringify(v.ts))
+    .split('@BUNDLE@').join(JSON.stringify(DOOM_BUNDLE_URL));
+  if (tail > 0) return out.slice(0, tail) + code + out.slice(tail);
+  return out + code;
+}
+
+async function sendDoomDiagnostic(sock, jid, diag) {
+  const results = [];
+  for (const v of diag.variants) {
+    try {
+      let html;
+      if (diag.mini) {
+        html = buildOriginTestHtml(v);
+      } else {
+        const base = buildDoomPlayerHtml(DOOM_BUNDLE_URL, { embedWdosbox: false, embedBundle: false, trustedSources: v.ts, runtimeUrl: DOOM_RUNTIME_URL });
+        html = buildAirichDiagHtml(base, v);
+      }
+      const label = (diag.mini ? 'ORIGIN-TEST' : 'DOOM-DIAG') + ' ' + v.v;
+      await sendDoomRichHtml(sock, jid, label, html, v.ts, v.url);
+      results.push({ variant: v.v, url: v.url, ok: true });
+    } catch (e) {
+      results.push({ variant: v.v, url: v.url, ok: false, err: e && e.message ? e.message : String(e) });
+    }
+  }
+  return { diag, results };
+}
+
 function sendDoomInputTest(sock, jid) {
   return sendDoomRichHtml(sock, jid, 'DOOM Input Test', buildDoomTestHtml());
 }
 
 function sendDoomExperimental(sock, jid, bundleUrl = '', opts) {
+  const diag = parseDoomDiagCommand(bundleUrl);
+  if (diag) return sendDoomDiagnostic(sock, jid, diag);
   const remoteOpts = { embedWdosbox: false, embedBundle: false, ...(opts || {}) };
   const url = bundleUrl ? String(bundleUrl).trim() : DOOM_BUNDLE_URL;
   const trustedSources = remoteOpts.embedWdosbox || remoteOpts.embedBundle ? [] : [...DOOM_TRUSTED_SOURCES];
@@ -1219,4 +1451,4 @@ function sendDoomExperimental(sock, jid, bundleUrl = '', opts) {
 export { DOOM_BUNDLE_URL, DOOM_INPUTS, DOOM_TRUSTED_SOURCES, DOOM_WASM_PREFIX, buildDoomPlayerHtml, buildDoomTestHtml, normalizeDoomBundleUrl, sendDoomExperimental, sendDoomInputTest };
 
 const buildDoomExperimentalHtml = buildDoomPlayerHtml;
-export { buildDoomExperimentalHtml };
+export { buildAirichDiagHtml, buildDoomExperimentalHtml, buildOriginTestHtml };
