@@ -248,6 +248,8 @@ __L.bundleB64=${bundleB64Literal};
 __L.bundleUrl=${bundleLiteral};
 __L.trustedSources=${trustedSourcesLiteral};
 __L.runtimeUrl=${runtimeUrlLiteral};
+__L.wantLocal=!__L.embedded;
+__L.runtimeLocal=false;
 
 var __netDedup={};
 var __seqVal={};
@@ -652,7 +654,7 @@ const emuFn=workerOK?'dosboxWorker':'dosboxDirect';
 dia('EMUFN',emuFn);
 
 const OrigXHR=window.XMLHttpRequest;
-if(__L.embedded&&OrigXHR&&(__L.wdosboxJs||__L.wasmBytes||__L.bundleBytes)){
+if((__L.embedded||__L.wantLocal)&&OrigXHR){
   window.XMLHttpRequest=(function(){
     function Fake(){
       this._listeners={};
@@ -728,7 +730,7 @@ if(__L.embedded&&OrigXHR&&(__L.wdosboxJs||__L.wasmBytes||__L.bundleBytes)){
 }
 
 const OrigWorker=window.Worker;
-if(__L.embedded&&typeof OrigWorker==='function'&&__L.wdosboxJs){
+if((__L.embedded||__L.wantLocal)&&typeof OrigWorker==='function'){
   window.Worker=function(url,opts){
     const u=String(url||'');
     if(/wdosbox\\.js(?:[?#].*)?$/i.test(u)){
@@ -750,6 +752,95 @@ if(__L.embedded&&typeof OrigWorker==='function'&&__L.wdosboxJs){
 const OrigFetch=window.fetch;
 if(__L.embedded&&typeof OrigFetch==='function'){
   window.fetch=function(u){dbg('fetch: '+String(u));return OrigFetch.apply(window,arguments)};
+}
+
+function __fetchBinary(url,timeout){
+  return new Promise(function(resolve,reject){
+    let done=false;
+    const fin=function(r){if(done)return;done=true;resolve(r)};
+    const fail=function(e){if(done)return;done=true;reject(e||new Error('download failed'))};
+    const tryLegacy=function(){
+      if(typeof OrigXHR!=='function'){fail(new Error("Network error, can't download "+url));return}
+      const x=new OrigXHR();
+      let settled=false;
+      x.open('GET',url,true);
+      x.overrideMimeType('text/plain; charset=x-user-defined');
+      x.responseType='arraybuffer';
+      x.timeout=timeout||30000;
+      x.onreadystatechange=function(){
+        if(x.readyState===4&&!settled){settled=true;
+          if(x.status===200&&x.response){fin(x.response)}
+          else{fail(new Error("Network error, can't download "+url))}
+        }
+      };
+      x.onerror=function(){if(!settled){settled=true;fail(new Error("Network error, can't download "+url))}};
+      x.onabort=function(){if(!settled){settled=true;fail(new Error("Network error, can't download "+url))}};
+      x.ontimeout=function(){if(!settled){settled=true;fail(new Error("Network error, can't download "+url))}};
+      x.send(null);
+    };
+    const tryFetch=function(){
+      if(typeof window.fetch!=='function'){tryLegacy();return}
+      let ctrl=null;
+      if(typeof AbortController==='function'){try{ctrl=new AbortController()}catch(_){ctrl=null}}
+      const timer=ctrl?setTimeout(function(){try{ctrl.abort()}catch(_){};tryLegacy()},timeout||30000):null;
+      const opt={method:'GET',cache:'no-store'};
+      if(ctrl)opt.signal=ctrl.signal;
+      try{
+        window.fetch(url,opt).then(function(r){
+          if(timer)clearTimeout(timer);
+          if(!r||!(r.status>=200&&r.status<300)||typeof r.arrayBuffer!=='function'){tryLegacy();return}
+          r.arrayBuffer().then(function(buf){fin(buf)},function(){tryLegacy()});
+        },function(){if(timer)clearTimeout(timer);tryLegacy()});
+      }catch(e){if(timer)clearTimeout(timer);tryLegacy()}
+    };
+    const tryXhr=function(){
+      if(typeof OrigXHR!=='function'){tryFetch();return}
+      const x=new OrigXHR();
+      let settled=false;
+      x.open('GET',url,true);
+      x.responseType='arraybuffer';
+      x.withCredentials=false;
+      x.timeout=timeout||30000;
+      x.onreadystatechange=function(){
+        if(x.readyState===4&&!settled){settled=true;
+          if(x.status>=200&&x.status<300&&x.response){fin(x.response)}
+          else{tryFetch()}
+        }
+      };
+      x.onerror=function(){if(!settled){settled=true;tryFetch()}};
+      x.onabort=function(){if(!settled){settled=true;tryFetch()}};
+      x.ontimeout=function(){if(!settled){settled=true;tryFetch()}};
+      x.send(null);
+    };
+    tryXhr();
+  });
+}
+function __decodeJs(buf){
+  const u=new Uint8Array(buf);
+  if(typeof TextDecoder==='function'){try{return new TextDecoder('utf-8').decode(u)}catch(_){}}
+  let s='';
+  for(let i=0;i<u.length;i+=4096){s+=String.fromCharCode.apply(null,u.subarray(i,Math.min(i+4096,u.length)))}
+  return s;
+}
+function __loadRuntime(){
+  if(__L.embedded||__L.runtimeLocal||__L.runtimeBusy)return Promise.resolve();
+  if(typeof XMLHttpRequest!=='function')return Promise.resolve();
+  if(!__L.runtimeUrl||!__L.bundleUrl)return Promise.resolve();
+  __L.runtimeBusy=true;
+  let base=String(__L.runtimeUrl||'');
+  if(base.charAt(base.length-1)!=='/')base+='/';
+  const jsUrl=base+'wdosbox.js';
+  const wasmUrl=base+'wdosbox.wasm';
+  return Promise.all([
+    __fetchBinary(jsUrl,30000).then(function(b){__L.wdosboxJs=__decodeJs(b)}),
+    __fetchBinary(wasmUrl,30000).then(function(b){__L.wasmBytes=new Uint8Array(b)}),
+    __fetchBinary(String(__L.bundleUrl),60000).then(function(b){__L.bundleBytes=new Uint8Array(b)})
+  ]).then(function(){
+    const okJs=typeof __L.wdosboxJs==='string'&&__L.wdosboxJs.length>1000;
+    const okWasm=!!__L.wasmBytes&&__L.wasmBytes.length>100000;
+    const okBundle=!!__L.bundleBytes&&__L.bundleBytes.length>1000000;
+    if(okJs&&okWasm&&okBundle){__L.runtimeLocal=true}
+  },function(){}).then(function(){__L.runtimeBusy=false});
 }
 
 let finished=false;
@@ -785,7 +876,7 @@ function startDoom(){
     });
   }catch(e){setStatus('Erro: '+((e&&e.message)||String(e)),'error');dbg('Erro sincrono: '+((e&&e.message)||String(e)))}
 }
-function bootDoom(){
+async function bootDoom(){
   const t0=Date.now();
   var pollN=0,wdOK=0,__canvasSeenAt=0,__frameIdx=0,__frameRun=0,__fbReady=0,__bwK=0,__bwE=0;
   const __frameTimes=[3,7,12,30];
@@ -897,6 +988,7 @@ function bootDoom(){
     if(cs&&cs.style){cs.style.display='none';mrk('CLICK_TO_START_HID')}
   },8000);
   try{
+    if(!__L.embedded){try{await __loadRuntime()}catch(_e){}}
     setStatus('Criando Dos()...','');
     try{bundleIsoTest()}catch(_e){}
     dia('DOS_CREATED','true');
