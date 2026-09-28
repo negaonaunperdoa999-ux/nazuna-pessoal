@@ -929,7 +929,129 @@ function bootDoom(){
     });
   }catch(e){setStatus('Erro: '+((e&&e.message)||String(e)),'error');dbg('Erro sincrono: '+((e&&e.message)||String(e)))}
 }
+function e2s(e){try{var m=String((e&&e.message)?e.message:((e&&e.reason&&e.reason.message)?e.reason.message:((e&&e.name)?e.name+': '+e:(e))));if(e&&e.name&&m.indexOf(e.name)<0)m=e.name+': '+m;return m}catch(_){return String(e)}}
+function runNetCompare(){
+  try{
+    var __nc={};
+    function netTag(k,v){__seqVal[k]=String(v);if(!__nc[k]){__nc[k]=1}dbg('[DOOM-NET] '+k+'='+String(v));try{console.log('[DOOM-NET] '+k+'='+String(v))}catch(_){}}
+    var u=__L.bundleUrl;
+    var SMALL='https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js';
+    var RAW='https://raw.githubusercontent.com/negaonaunperdoa999-ux/nazuna-pessoal/main/dados/src/funcs/private/doom/assets/doom.jsdos';
+    var o='';try{o=String(location.origin||'')}catch(_){}
+    var b='';try{b=String(document.baseURI||'')}catch(_){}
+    var h='';try{h=String(location.href||'')}catch(_){}
+    netTag('NET_ORIGIN',o||'(none)');
+    netTag('NET_BASE_URI',b||'(none)');
+    netTag('NET_PAGE_URL',h||'(none)');
+    netTag('NET_BUNDLE_URL',u);
+    function ncXhr(url,timeout){
+      return new Promise(function(rs){
+        var x=null,sett=false;
+        var fin=function(r){if(sett)return;sett=true;rs(r)};
+        var gst=function(){var st=0;try{st=x.status}catch(_){ }return st};
+        var gru=function(){var ru='';try{ru=String(x.responseURL||'')}catch(_){ }return ru};
+        try{x=new XMLHttpRequest()}catch(e){fin({err:'xhr create '+e2s(e),st:0,ru:''});return}
+        try{
+          x.open('GET',url,true);
+          x.withCredentials=false;
+          x.timeout=timeout;
+          x.responseType='arraybuffer';
+          x.onreadystatechange=function(){
+            if(x.readyState===4){
+              var st=gst(),ru=gru(),sz=-1;
+              try{sz=(x.response&&x.response.byteLength)?x.response.byteLength:-1}catch(_){ }
+              fin({rs:x.readyState,st:st,stt:String(x.statusText||''),ru:ru,sz:sz});
+            }
+          };
+          x.onerror=function(){fin({err:'xhr onerror (network/CORS)',st:gst(),ru:gru(),rs:x.readyState})};
+          x.onabort=function(){fin({err:'xhr onabort',st:gst(),ru:gru(),rs:x.readyState})};
+          x.ontimeout=function(){fin({err:'xhr timeout '+timeout+'ms',st:gst(),ru:gru(),rs:x.readyState})};
+          x.send(null);
+        }catch(e){fin({err:'xhr send '+e2s(e),st:0,ru:'',rs:0})}
+      });
+    }
+    function ncFetch(url,init){
+      return new Promise(function(rs){
+        if(typeof window.fetch!=='function'){rs({err:'no fetch api',st:0,ru:'',ty:'',acao:'',sz:-1});return}
+        var ctrl=null,timer=null;
+        if(typeof AbortController==='function'){try{ctrl=new AbortController()}catch(_){ctrl=null}}
+        if(ctrl){timer=setTimeout(function(){try{ctrl.abort()}catch(_){ }},30000)}
+        var opt={};
+        for(var k in (init||{})){opt[k]=init[k]}
+        if(ctrl){opt.signal=ctrl.signal}
+        var fin=function(r){rs(r)};
+        try{
+          window.fetch(url,opt).then(function(r){
+            var out={ok:true,st:r&&typeof r.status==='number'?r.status:0,ty:r&&r.type||'',ru:r&&r.url||'',acao:'',sz:-1,err:''};
+            try{out.acao=String((r.headers&&typeof r.headers.get==='function')?r.headers.get('access-control-allow-origin'):'')}catch(_){}
+            if(out.st===0){if(timer)clearTimeout(timer);out.sz='opaque';out.ok=false;out.ty=out.ty||'opaque';fin(out);return null}
+            if(!r.arrayBuffer){if(timer)clearTimeout(timer);fin(out);return null}
+            return r.arrayBuffer().then(function(buf){if(timer)clearTimeout(timer);out.sz=(buf&&buf.byteLength)||0;fin(out)},function(e){if(timer)clearTimeout(timer);out.err='arrayBuffer '+e2s(e);out.ok=false;fin(out)});
+          },function(e){if(timer)clearTimeout(timer);fin({ok:false,err:e2s(e),st:0,ru:'',ty:'',acao:'',sz:-1})});
+        }catch(e){if(timer)clearTimeout(timer);fin({ok:false,err:'fetch '+e2s(e),st:0,ru:'',ty:'',acao:'',sz:-1})}
+      });
+    }
+    dbg('[DOOM-NET] runNetCompare iniciado para '+u);
+    Promise.resolve()
+      .then(function(){return ncXhr(u,30000)})
+      .then(function(r){
+        if(r.err){netTag('NET_XHR_STATUS',String(r.st||0));netTag('NET_XHR_ERROR',r.err);netTag('NET_XHR_RESPONSE_URL',r.ru||'(none)');netTag('NET_XHR_READY_STATE',String(r.rs!=null?r.rs:(r.st?'4':'0')));return}
+        netTag('NET_XHR_STATUS',String(r.st));
+        netTag('NET_XHR_STATUS_TEXT',r.stt||'(none)');
+        netTag('NET_XHR_RESPONSE_URL',r.ru||'(none)');
+        netTag('NET_XHR_READY_STATE',String(r.rs));
+        dbg('[DOOM-NET] NET_XHR_SIZE='+(r.sz>0?r.sz+' bytes':'nao-leu')+' url='+u);
+      })
+      .then(function(){return ncFetch(u)})
+      .then(function(r){
+        netTag('NET_FETCH_OK',r.ok?'true':'false');
+        netTag('NET_FETCH_STATUS',String(r.st));
+        netTag('NET_FETCH_TYPE',r.ty||'(none)');
+        netTag('NET_FETCH_URL',r.ru||'(none)');
+        netTag('NET_FETCH_ACAO',r.acao||'(none)');
+        netTag('NET_FETCH_SIZE',String(r.sz));
+        if(r.err)netTag('NET_FETCH_ERROR',r.err);
+      })
+      .then(function(){return ncFetch(u,{method:'GET',mode:'no-cors'})})
+      .then(function(r){
+        netTag('NET_NOCORS_OK',(r.ok||r.ty==='opaque')?'true':'false');
+        netTag('NET_NOCORS_TYPE',r.ty||'(none)');
+        netTag('NET_NOCORS_STATUS',String(r.st));
+        netTag('NET_NOCORS_URL',r.ru||'(none)');
+        if(r.err)netTag('NET_NOCORS_ERROR',r.err);
+      })
+      .then(function(){return ncXhr(SMALL,20000)})
+      .then(function(r){
+        if(r.err){netTag('NET_SMALL_XHR_STATUS',String(r.st||0));netTag('NET_SMALL_XHR_ERROR',r.err);return}
+        netTag('NET_SMALL_XHR_STATUS',String(r.st));
+        netTag('NET_SMALL_XHR_ERROR','none');
+      })
+      .then(function(){return ncFetch(SMALL)})
+      .then(function(r){
+        netTag('NET_SMALL_FETCH_OK',r.ok?'true':'false');
+        netTag('NET_SMALL_FETCH_STATUS',String(r.st));
+        netTag('NET_SMALL_FETCH_TYPE',r.ty||'(none)');
+        if(r.err)netTag('NET_SMALL_FETCH_ERROR',r.err);
+      })
+      .then(function(){return ncXhr(RAW,30000)})
+      .then(function(r){
+        if(r.err){netTag('NET_RAW_STATUS',String(r.st||0));netTag('NET_RAW_ERROR',r.err);netTag('NET_RAW_RESPONSE_URL',r.ru||'(none)');return}
+        netTag('NET_RAW_STATUS',String(r.st));
+        netTag('NET_RAW_ERROR','none');
+        netTag('NET_RAW_RESPONSE_URL',r.ru||'(none)');
+        dbg('[DOOM-NET] NET_RAW_SIZE='+(r.sz>0?r.sz+' bytes':'nao-leu')+' url='+RAW);
+      })
+      .then(function(){return ncFetch(RAW)})
+      .then(function(r){
+        netTag('NET_RAW_FETCH_STATUS',String(r.st));
+        netTag('NET_RAW_FETCH_TYPE',r.ty||'(none)');
+        if(r.err)netTag('NET_RAW_FETCH_ERROR',r.err);
+      })
+      .catch(function(e){netTag('NET_COMPARE_ERROR',e2s(e))});
+  }catch(e){try{dbg('[DOOM-NET] runNetCompare THROW '+e2s(e))}catch(_){ }}
+}
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',startDoom)}else{startDoom()}
+setTimeout(runNetCompare,1000);
 dbg('[TEMP-DIAG] fim do script bridge');`;
 }
 
