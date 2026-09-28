@@ -1237,36 +1237,58 @@ function buildOriginTestHtml(v) {
     + 'try{origin=String(location.origin||"")}catch(_){ }'
     + 'try{base=String(document.baseURI||"")}catch(_){ }'
     + 'try{ua=String(navigator.userAgent||"")}catch(_){ }'
-    + 'out("origin","AIRICH_URL_FIELD=' + JSON.stringify(v.url) + ' | ORIGIN="+(origin||"(null)")+(origin==="null"?" (OBS: opaque/null)":"")+" | href="+(href||"(none)")+" | base="+(base||"(none)")+" | mini-ua="+(ua.slice(0,80)||"-"));'
+    + 'var urlF=' + JSON.stringify(String(v.url||'')) + ';'
+    + 'out("origin","AIRICH_URL_FIELD="+urlF+" | ORIGIN="+(origin||"(null)")+(origin==="null"?" (OBS: opaque/null)":"")+" | href="+(href||"(none)")+" | base="+(base||"(none)")+" | mini-ua="+(ua.slice(0,80)||"-"));'
     + 'var SMALL="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/js-dos.js";'
     + 'var WD="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.js";'
     + 'var WSM="https://cdn.jsdelivr.net/npm/js-dos@7.5.0/dist/wdosbox.wasm";'
     + 'var BDL=' + JSON.stringify(bundle) + ';'
     + 'var xh=function(u,m,id){'
+    + '  var x=null;'
+    + '  try{x=new XMLHttpRequest()}catch(e){out(id,"ex "+String(e&&e.message||e));return}'
+    + '  var done=false,wd=null;'
+    + '  var fin=function(t){if(done)return;done=true;if(wd){try{clearTimeout(wd)}catch(_){ }}out(id,t)};'
     + '  try{'
-    + '    var x=new XMLHttpRequest();'
     + '    x.open(m||"GET",u,true);'
     + '    try{x.responseType="arraybuffer"}catch(_){ }'
-    + '    x.timeout=25000;'
-    + '    var done=false;'
-    + '    var fin=function(t){if(done)return;done=true;out(id,t)};'
-    + '    x.onreadystatechange=function(){if(x.readyState===4){var st="";try{st=String(x.status)}catch(_){ }var ru="";try{ru=String(x.responseURL||"")}catch(_){ }var stt="";try{stt=String(x.statusText||"")}catch(_){ }fin("status="+st+" stt="+(stt||"-")+" respURL="+(ru||"(none)")+(st==="0"?" (possivel CORS ou bloqueio)":""))}};'
-    + '    x.onerror=function(){fin("onerror status="+x.status+" (network/CORS)")};'
-    + '    x.onabort=function(){fin("onabort")};'
-    + '    x.ontimeout=function(){fin("timeout")};'
+    + '    try{x.timeout=3000}catch(_){ }'
+    + '    x.onreadystatechange=function(){'
+    + '      if(x.readyState===4){'
+    + '        var st="";try{st=String(x.status)}catch(_){ }'
+    + '        if(st==="0"){fin("NO_RESPONSE status=0 (nao enviado/CORS)");return}'
+    + '        var ru="";try{ru=String(x.responseURL||"")}catch(_){ }'
+    + '        var stt="";try{stt=String(x.statusText||"")}catch(_){ }'
+    + '        var sz="";try{sz=(x.response&&x.response.byteLength?String(x.response.byteLength):"-")}catch(_){ }'
+    + '        fin("status="+st+" stt="+(stt||"-")+" bytes="+sz+" respURL="+(ru||"(none)"));'
+    + '      }'
+    + '    };'
+    + '    x.onerror=function(){fin("ERROR onerror status="+String(x.status)+" (network/CORS)")};'
+    + '    x.onabort=function(){fin("ERROR onabort")};'
+    + '    x.ontimeout=function(){fin("TIMEOUT")};'
+    + '    wd=setTimeout(function(){fin("TIMEOUT (watchdog)")},3500);'
     + '    x.send(null);'
-    + '  }catch(e){out(id,"ex "+String(e&&e.message||e))}'
+    + '  }catch(e){fin("ex "+String(e&&e.message||e))}'
     + '};'
     + 'var fe=function(u,id,extra){'
     + '  if(typeof window.fetch!=="function"){out(id,"no-fetch-api");return}'
-    + '  var opts=extra||{};var ctrl=null;try{if(typeof AbortController==="function")ctrl=new AbortController()}catch(_){ }'
-    + '  if(ctrl){opts={};for(var k in (extra||{}))opts[k]=extra[k];opts.signal=ctrl.signal;setTimeout(function(){try{ctrl.abort()}catch(_){ }out(id,"timeout")},25000)}'
+    + '  var done=false,og=null,tm=null;'
+    + '  var fin=function(t){if(done)return;done=true;if(tm){try{clearTimeout(tm)}catch(_){ }}out(id,t)};'
+    + '  var opts={};for(var k in (extra||{}))opts[k]=extra[k];'
+    + '  try{if(typeof AbortController==="function")og=new AbortController()}catch(_){ }'
+    + '  if(og){opts.signal=og.signal;tm=setTimeout(function(){try{og.abort()}catch(_){ }fin("TIMEOUT")},3000)}'
+    + '  else{tm=setTimeout(function(){fin("TIMEOUT (watchdog, sem AbortController)")},3000)}'
     + '  try{'
     + '    window.fetch(u,opts).then(function(r){'
+    + '      if(r&&typeof r.status!=="undefined"&&Number(r.status)===0&&String(r.type)==="opaque"){fin("NO_RESPONSE type=opaque status=0 (no-cors)");return}'
     + '      var acao="";try{acao=String(r.headers&&typeof r.headers.get==="function"?r.headers.get("access-control-allow-origin")||"":"")}catch(_){ }'
-    + '      out(id,"ok="+(r.ok?"true":"false")+" type="+(r.type||"-")+" status="+r.status+" url="+(r.url||"(none)")+(acao?" acao="+acao:""));'
-    + '    },function(e){out(id,"err "+String(e&&e.message||e))});'
-    + '  }catch(e){out(id,"ex "+String(e&&e.message||e))}'
+    + '      fin("ok="+(r.ok?"true":"false")+" type="+(r.type||"-")+" status="+String(r.status)+" url="+(String(r.url||"(none)"))+(acao?" acao="+acao:""));'
+    + '    },function(e){'
+    + '      var nm="",msg="";try{nm=String(e&&e.name||"")}catch(_){ }try{msg=String(e&&e.message||e)}catch(_){ }'
+    + '      if(nm==="AbortError"){fin("TIMEOUT")}'
+    + '      else if(/Failed to fetch/i.test(msg)||/NetworkError/i.test(msg)){fin("ERROR: TypeError: Failed to fetch")}'
+    + '      else{fin("ERROR: "+(msg||nm||"fetch error"))}'
+    + '    });'
+    + '  }catch(e){fin("ex "+String(e&&e.message||e))}'
     + '};'
     + 'setTimeout(function(){'
     + '  xh(SMALL,"GET","xhr");'
@@ -1320,8 +1342,8 @@ var __wvdRun=function(){
   var xg=function(url,head,tout){
     return new Promise(function(res){
       var x=null;try{x=new XMLHttpRequest()}catch(e){res({err:"no-xhr",st:0});return}
-      var done=false,t=null;
-      var fin=function(o){if(done)return;done=true;if(t)clearTimeout(t);res(o)};
+      var done=false,t=null,wd=null;
+      var fin=function(o){if(done)return;done=true;if(t){try{clearTimeout(t)}catch(_){ }}if(wd){try{clearTimeout(wd)}catch(_){ }}res(o)};
       try{
         x.open(head?"HEAD":"GET",url,true);
         try{x.timeout=tout}catch(_){ }
@@ -1333,36 +1355,44 @@ var __wvdRun=function(){
             try{ru=String(x.responseURL||"")}catch(_){ }
             try{stt=String(x.statusText||"")}catch(_){ }
             try{sz=(x.response&&x.response.byteLength?x.response.byteLength:-1)}catch(_){ }
+            if(st===0){fin({err:"NO_RESPONSE status=0 (nao enviado/CORS)",st:0});return}
             fin({st:st,stt:stt,ru:ru,sz:sz,head:head});
           }
         };
-        x.onerror=function(){fin({err:"onerror",st:0})};
-        x.onabort=function(){fin({err:"onabort",st:0})};
-        x.ontimeout=function(){fin({err:"timeout",st:0})};
+        x.onerror=function(){fin({err:"ERROR onerror status="+String(x.status)+" (network/CORS)",st:0})};
+        x.onabort=function(){fin({err:"ERROR onabort",st:0})};
+        x.ontimeout=function(){fin({err:"TIMEOUT",st:0})};
+        wd=setTimeout(function(){fin({err:"TIMEOUT (watchdog)",st:0})},(tout>0?tout:3000)+500);
         x.send(null);
-      }catch(e){fin({err:String(e&&e.message||e),st:0})}
+      }catch(e){fin({err:"ex "+String(e&&e.message||e),st:0})}
     });
   };
   var fg=function(url,init){
     return new Promise(function(res){
       if(typeof window.fetch!=="function"){res({err:"no-fetch",st:0,ty:""});return}
-      var ctrl=null,timer=null;
+      var ctrl=null,timer=null,done=false;
+      var fin=function(o){if(done)return;done=true;if(timer){try{clearTimeout(timer)}catch(_){ }}res(o)};
       try{if(typeof AbortController==="function")ctrl=new AbortController()}catch(_){ }
-      if(ctrl)timer=setTimeout(function(){try{ctrl.abort()}catch(_){ }res({err:"timeout",st:0})},25000);
       var opt={};
       for(var k in (init||{}))opt[k]=init[k];
-      if(ctrl)opt.signal=ctrl.signal;
+      if(ctrl){opt.signal=ctrl.signal;timer=setTimeout(function(){try{ctrl.abort()}catch(_){ }fin({err:"TIMEOUT",st:0})},3000)}
+      else{timer=setTimeout(function(){fin({err:"TIMEOUT (watchdog, sem AbortController)",st:0})},3000)}
       try{
         window.fetch(url,opt).then(function(r){
-          if(timer)clearTimeout(timer);
+          if(r&&typeof r.status!=="undefined"&&Number(r.status)===0&&String(r.type)==="opaque"){fin({err:"NO_RESPONSE type=opaque status=0 (no-cors)",st:0,ty:"opaque"});return}
           var acao="";try{acao=String(r.headers&&typeof r.headers.get==="function"?r.headers.get("access-control-allow-origin")||"":"")}catch(_){ }
-          res({ok:r.ok,st:r.status,ty:String(r.type||""),ru:String(r.url||""),acao:acao});
-        },function(e){if(timer)clearTimeout(timer);res({err:String(e&&e.message||e),st:0})});
-      }catch(e){if(timer)clearTimeout(timer);res({err:String(e&&e.message||e),st:0})}
+          fin({ok:r.ok,st:r.status,ty:String(r.type||""),ru:String(r.url||""),acao:acao});
+        },function(e){
+          var nm="",msg="";try{nm=String(e&&e.name||"")}catch(_){ }try{msg=String(e&&e.message||e)}catch(_){ }
+          if(nm==="AbortError"){fin({err:"TIMEOUT",st:0})}
+          else if(/Failed to fetch/i.test(msg)||/NetworkError/i.test(msg)){fin({err:"ERROR: TypeError: Failed to fetch",st:0})}
+          else{fin({err:"ERROR: "+(msg||nm||"fetch error"),st:0})}
+        });
+      }catch(e){fin({err:"ex "+String(e&&e.message||e),st:0})}
     });
   };
   var fd=function(r){
-    if(r.err)return "err="+r.err+(r.st?" status="+r.st:"");
+    if(r.err)return String(r.err)+(r.st?" status="+r.st:"");
     var p="status="+r.st;
     if(r.stt)p+=" stt="+(r.stt||"-");
     if(r.ty)p+=" type="+r.ty;
@@ -1374,23 +1404,26 @@ var __wvdRun=function(){
     return p;
   };
   var steps=[
-    {m:"AIRICH_XHR_JSDOS",run:function(){return xg(__WVD.small,false,25000)}},
+    {m:"AIRICH_XHR_JSDOS",run:function(){return xg(__WVD.small,false,3000)}},
     {m:"AIRICH_FETCH_JSDOS",run:function(){return fg(__WVD.small,{})}},
-    {m:"AIRICH_XHR_WDJS_HEAD",run:function(){return xg(__WVD.wdjs,true,20000)}},
-    {m:"AIRICH_XHR_WASM_HEAD",run:function(){return xg(__WVD.wasm,true,20000)}},
-    {m:"AIRICH_XHR_BUNDLE_HEAD",run:function(){return xg(__WVD.bundle,true,25000)}},
+    {m:"AIRICH_XHR_WDJS_HEAD",run:function(){return xg(__WVD.wdjs,true,3000)}},
+    {m:"AIRICH_XHR_WASM_HEAD",run:function(){return xg(__WVD.wasm,true,3000)}},
+    {m:"AIRICH_XHR_BUNDLE_HEAD",run:function(){return xg(__WVD.bundle,true,3000)}},
     {m:"AIRICH_FETCH_BUNDLE_HEAD",run:function(){return fg(__WVD.bundle,{method:"HEAD"})}},
     {m:"AIRICH_FETCH_BUNDLE_NOCORS_HEAD",run:function(){return fg(__WVD.bundle,{method:"HEAD",mode:"no-cors"})}},
-    {m:"AIRICH_XHR_SMALL_SAMEDOMAIN",run:function(){return xg(__WVD.pkg,false,15000)}},
+    {m:"AIRICH_XHR_SMALL_SAMEDOMAIN",run:function(){return xg(__WVD.pkg,false,3000)}},
     {m:"AIRICH_FETCH_SMALL_SAMEDOMAIN",run:function(){return fg(__WVD.pkg,{})}}
   ];
-  var chain=Promise.resolve();
+  var guard=setTimeout(function(){
+    try{for(var gi=0;gi<steps.length;gi++){if(!steps[gi].done){steps[gi].done=true;__wvdLog(steps[gi].m,"TIMEOUT (watchdog global)")}}console.log("[AIRICH_URL_TEST] DONE variant="+__WVD.v)}catch(e){ }
+  },4000);
+  var ops=[];
   for(var i=0;i<steps.length;i++){
     (function(s){
-      chain=chain.then(function(){return s.run()}).then(function(r){__wvdLog(s.m,fd(r))}).catch(function(e){__wvdLog(s.m,"ex "+String(e&&e.message||e))});
+      ops.push(Promise.resolve().then(function(){return s.run()}).then(function(r){s.done=true;__wvdLog(s.m,fd(r))}).catch(function(e){s.done=true;__wvdLog(s.m,"ex "+String(e&&e.message||e))}));
     })(steps[i]);
   }
-  chain=chain.then(function(){try{console.log("[AIRICH_URL_TEST] DONE variant="+__WVD.v)}catch(e){ }});
+  Promise.all(ops).then(function(){try{if(guard)clearTimeout(guard)}catch(e){ }try{console.log("[AIRICH_URL_TEST] DONE variant="+__WVD.v)}catch(e){ }});
 };
 window.setTimeout(function(){try{if(typeof XMLHttpRequest!=="function")return;__wvdPanel();__wvdRun()}catch(e){try{console.log("[AIRICH_URL_TEST] ex "+String(e&&e.message||e))}catch(_){ }}},500);
 `;
