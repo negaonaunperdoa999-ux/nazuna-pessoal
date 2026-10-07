@@ -1723,17 +1723,13 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
 
         // Destino do dono: forma da config (LID/PN) + fallback em número puro
         // e, se o dono for o próprio bot, o JID do próprio bot.
-        const autoRevDono = buildUserId(numerodono, config);
+        const autoRevDonoCfg = buildUserId(numerodono, config);
         const autoRevDonoPn = `${String(numerodono || '').replace(/[^\d]/g, '')}@s.whatsapp.net`;
-        const autoRevDigits = (j) => String(j || '').split('@')[0].replace(/[^\d]/g, '');
-        const autoRevDonoEhBot = Boolean(autoRevDono && botId && (autoRevDono === botId || autoRevDigits(autoRevDono) === autoRevDigits(botId)));
+        const botIdCur = botId || (typeof getBotId === 'function' ? getBotId(nazu) : null) || (nazu?.user?.id && nazu.user.id.split(':')[0]);
         const autoRevAlvos = [];
-        for (const alvo of [autoRevDono, autoRevDonoPn, autoRevDonoEhBot ? botId : null]) {
+        const candidatos = [autoRevDonoCfg, autoRevDonoPn, botIdCur];
+        for (const alvo of candidatos) {
           if (alvo && !autoRevAlvos.includes(alvo)) autoRevAlvos.push(alvo);
-        }
-        if (!autoRevAlvos.length) {
-          logAutoRev(`ignorada: número do dono inválido (numerodono=${numerodono})`);
-          return;
         }
 
         logAutoRev(`mídia de visualização única detectada em ${from} (remetente=${sender}, ${detalhe}, alvo=${autoRevAlvos.join(' -> ')}${autoRevDonoEhBot ? ' [dono = próprio número do bot]' : ''})`);
@@ -23872,9 +23868,10 @@ ${prefix}togglecmdvip premium_ia off`);
       case 'revelar':
         try {
           var RSMM = info.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-          var boij22 = RSMM?.imageMessage || info.message?.imageMessage || RSMM?.viewOnceMessageV2?.message?.imageMessage || info.message?.viewOnceMessageV2?.message?.imageMessage || info.message?.viewOnceMessage?.message?.imageMessage || RSMM?.viewOnceMessage?.message?.imageMessage;
-          var boijj = RSMM?.videoMessage || info.message?.videoMessage || RSMM?.viewOnceMessageV2?.message?.videoMessage || info.message?.viewOnceMessageV2?.message?.videoMessage || info.message?.viewOnceMessage?.message?.videoMessage || RSMM?.viewOnceMessage?.message?.videoMessage;
-          var boij33 = RSMM?.audioMessage || info.message?.audioMessage || RSMM?.viewOnceMessageV2?.message?.audioMessage || info.message?.viewOnceMessageV2?.message?.audioMessage || info.message?.viewOnceMessage?.message?.audioMessage || RSMM?.viewOnceMessage?.message?.audioMessage;
+          var boij22 = RSMM?.imageMessage || info.message?.imageMessage || RSMM?.viewOnceMessageV2?.message?.imageMessage || RSMM?.viewOnceMessageV2Extension?.message?.imageMessage || info.message?.viewOnceMessageV2?.message?.imageMessage || info.message?.viewOnceMessageV2Extension?.message?.imageMessage || RSMM?.viewOnceMessage?.message?.imageMessage || info.message?.viewOnceMessage?.message?.imageMessage;
+          var boijj = RSMM?.videoMessage || info.message?.videoMessage || RSMM?.viewOnceMessageV2?.message?.videoMessage || RSMM?.viewOnceMessageV2Extension?.message?.videoMessage || info.message?.viewOnceMessageV2?.message?.videoMessage || info.message?.viewOnceMessageV2Extension?.message?.videoMessage || RSMM?.viewOnceMessage?.message?.videoMessage || info.message?.viewOnceMessage?.message?.videoMessage;
+          var boij33 = RSMM?.audioMessage || info.message?.audioMessage || RSMM?.viewOnceMessageV2?.message?.audioMessage || RSMM?.viewOnceMessageV2Extension?.message?.audioMessage || info.message?.viewOnceMessageV2?.message?.audioMessage || info.message?.viewOnceMessageV2Extension?.message?.audioMessage || RSMM?.viewOnceMessage?.message?.audioMessage || info.message?.viewOnceMessage?.message?.audioMessage;
+          var boij44 = RSMM?.documentMessage || info.message?.documentMessage || RSMM?.viewOnceMessageV2?.message?.documentMessage || RSMM?.viewOnceMessageV2Extension?.message?.documentMessage || info.message?.viewOnceMessageV2?.message?.documentMessage || info.message?.viewOnceMessageV2Extension?.message?.documentMessage || RSMM?.viewOnceMessage?.message?.documentMessage || info.message?.viewOnceMessage?.message?.documentMessage;
           if (boijj) {
             var px = boijj;
             px.viewOnce = false;
@@ -23897,6 +23894,15 @@ ${prefix}togglecmdvip premium_ia off`);
             var px = boij33;
             px.viewOnce = false;
             px.audio = {
+              url: px.url
+            };
+            await nazu.sendMessage(from, px, {
+              quoted: info
+            });
+          } else if (boij44) {
+            var px = boij44;
+            px.viewOnce = false;
+            px.document = {
               url: px.url
             };
             await nazu.sendMessage(from, px, {
