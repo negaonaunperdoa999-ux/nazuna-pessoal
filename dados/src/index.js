@@ -1698,28 +1698,50 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     // ==================== AUTOREV ====================
     // Revela mídias de visualização única recebidas (grupo ou privado) e as
     // encaminha somente para o dono, sem enviar nada no chat de origem.
-    async function processAutoRev(innerMessage) {
+    // Toda decisão gera log [AUTOREV] para aparecer no painel/console.
+    const logAutoRev = (msg) => {
+      try { console.log(`[AUTOREV] ${msg}`); } catch (e) {}
+    };
+
+    async function processAutoRev(innerMessage, detalhe) {
       try {
         const autoRevState = loadAutoRev();
-        if (!autoRevState || !autoRevState.enabled) return;
+        if (!autoRevState || !autoRevState.enabled) {
+          logAutoRev(`mídia de visualização única detectada (${detalhe}) mas o recurso está DESLIGADO - ative com ${config.prefixo || '/'}autorev on`);
+          return;
+        }
+
+        // Anti-loop: só bloqueia o que sai do próprio bot (nunca bloqueia terceiros/dono)
+        if (info.key.fromMe || isBotSender || info._fromPro) {
+          logAutoRev(`ignorada: mensagem enviada pelo próprio bot (origem ${from}, ${detalhe})`);
+          return;
+        }
 
         // Envio privado: mesmo padrão usado pelo bot para falar com o dono
         const donoJid = buildUserId(numerodono, config);
-        if (!donoJid) return;
+        if (!donoJid) {
+          logAutoRev(`ignorada: número do dono inválido (numerodono=${numerodono})`);
+          return;
+        }
 
-        // Anti-loop: mídia que já está no chat do dono ou que veio do próprio bot/dono
-        const chatsDoDono = [donoJid, ownerJid, nmrdn, lidowner].filter(Boolean);
-        const origemEhDoDono = chatsDoDono.some(id => idsMatch(from, id));
-        if (origemEhDoDono || info.key.fromMe || info._fromPro || isBotSender || isOwner) return;
+        logAutoRev(`mídia de visualização única detectada em ${from} (remetente=${sender}, ${detalhe})`);
 
         // Identificação do tipo de mídia (reutiliza getMediaInfo do projeto)
-        const mediaInfo = getMediaInfo(innerMessage)
-          || (innerMessage && innerMessage.audioMessage ? { media: innerMessage.audioMessage, type: 'audio' } : null);
-        if (!mediaInfo) return;
+        let mediaInfo = getMediaInfo(innerMessage);
+        if (!mediaInfo && innerMessage && innerMessage.audioMessage) mediaInfo = { media: innerMessage.audioMessage, type: 'audio' };
+        if (!mediaInfo && innerMessage && innerMessage.documentMessage) mediaInfo = { media: innerMessage.documentMessage, type: 'document' };
+        if (!mediaInfo) {
+          logAutoRev(`ignorada: conteúdo sem mídia suportada (chaves: ${Object.keys(innerMessage || {}).join(',') || 'vazio'})`);
+          return;
+        }
 
         // Download da mídia (reutiliza getFileBuffer do projeto)
+        logAutoRev(`baixando mídia (${mediaInfo.type})...`);
         const buffer = await getFileBuffer(mediaInfo.media, mediaInfo.type);
-        if (!buffer || !buffer.length) return;
+        if (!buffer || !buffer.length) {
+          logAutoRev('ignorada: download retornou vazio');
+          return;
+        }
 
         const media = mediaInfo.media;
         let conteudo = null;
@@ -1743,36 +1765,61 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
             mimetype: media.mimetype || 'audio/ogg; codecs=opus',
             ptt: Boolean(media.ptt)
           };
+        } else if (mediaInfo.type === 'document') {
+          conteudo = {
+            document: buffer,
+            mimetype: media.mimetype || 'application/octet-stream',
+            fileName: media.fileName || 'visualizacao-unica'
+          };
+          if (media.caption) conteudo.caption = media.caption;
         }
 
-        if (!conteudo) return;
+        if (!conteudo) {
+          logAutoRev(`ignorada: tipo de conteúdo não suportado (${mediaInfo.type})`);
+          return;
+        }
 
         await nazu.sendMessage(donoJid, conteudo);
-        console.log(`[AUTOREV] Mídia de visualização única revelada e enviada ao dono (origem: ${from}, tipo: ${mediaInfo.type})`);
+        logAutoRev(`revelada (${mediaInfo.type}) e enviada somente para o dono ${donoJid} - nada foi enviado em ${from}`);
       } catch (e) {
         console.error('[AUTOREV] Erro ao revelar mídia automaticamente:', e && e.message ? e.message : e);
       }
     }
 
-    if (!isStatus && !info.key.fromMe && !info._fromPro && info.message) {
-      let autoRevRoot = info.message;
-      if (autoRevRoot.ephemeralMessage && autoRevRoot.ephemeralMessage.message) {
-        autoRevRoot = autoRevRoot.ephemeralMessage.message;
+    if (!isStatus && info.message) {
+      // Desembrulha as camadas (ephemeral / viewOnce) até chegar no conteúdo real
+      let autoRevAtual = info.message;
+      const autoRevWrappers = [];
+      for (let autoRevPasso = 0; autoRevPasso < 6; autoRevPasso++) {
+        const antes = autoRevAtual;
+        if (autoRevAtual.ephemeralMessage && autoRevAtual.ephemeralMessage.message) {
+          autoRevAtual = autoRevAtual.ephemeralMessage.message;
+        } else if (autoRevAtual.viewOnceMessage && autoRevAtual.viewOnceMessage.message) {
+          autoRevWrappers.push('viewOnceMessage');
+          autoRevAtual = autoRevAtual.viewOnceMessage.message;
+        } else if (autoRevAtual.viewOnceMessageV2 && autoRevAtual.viewOnceMessageV2.message) {
+          autoRevWrappers.push('viewOnceMessageV2');
+          autoRevAtual = autoRevAtual.viewOnceMessageV2.message;
+        } else if (autoRevAtual.viewOnceMessageV2Extension && autoRevAtual.viewOnceMessageV2Extension.message) {
+          autoRevWrappers.push('viewOnceMessageV2Extension');
+          autoRevAtual = autoRevAtual.viewOnceMessageV2Extension.message;
+        } else if (autoRevAtual.documentWithCaptionMessage && autoRevAtual.documentWithCaptionMessage.message) {
+          autoRevAtual = autoRevAtual.documentWithCaptionMessage.message;
+        }
+        if (autoRevAtual === antes) break;
       }
 
-      const autoRevInner =
-        autoRevRoot.viewOnceMessage?.message ||
-        autoRevRoot.viewOnceMessageV2?.message ||
-        autoRevRoot.viewOnceMessageV2Extension?.message ||
-        null;
-
       const autoRevDireto =
-        autoRevRoot.imageMessage?.viewOnce === true ||
-        autoRevRoot.videoMessage?.viewOnce === true ||
-        autoRevRoot.audioMessage?.viewOnce === true;
+        autoRevAtual.imageMessage?.viewOnce === true ||
+        autoRevAtual.videoMessage?.viewOnce === true ||
+        autoRevAtual.audioMessage?.viewOnce === true ||
+        autoRevAtual.documentMessage?.viewOnce === true;
 
-      if (autoRevInner || autoRevDireto) {
-        await processAutoRev(autoRevInner || autoRevRoot);
+      if (autoRevWrappers.length > 0 || autoRevDireto) {
+        let autoRevTipo = 'vazio';
+        try { autoRevTipo = getContentType(autoRevAtual) || 'vazio'; } catch (e) {}
+        const autoRevDetalhe = `wrapper=${autoRevWrappers.join('+') || 'direto'} tipo=${autoRevTipo}`;
+        await processAutoRev(autoRevAtual, autoRevDetalhe);
       }
     }
 
