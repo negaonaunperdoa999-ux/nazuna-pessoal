@@ -30,6 +30,7 @@ const MENU_DESIGN_FILE = path.join(DONO_DIR, 'menuDesign.json');
 const ECONOMY_FILE = path.join(DATABASE_DIR, 'economy.json');
 const MSGPREFIX_FILE = path.join(DONO_DIR, 'msgprefix.json');
 const MSGBOTON_FILE = path.join(DONO_DIR, 'msgboton.json');
+const AUTOREV_FILE = path.join(DONO_DIR, 'autorev.json');
 const CUSTOM_REACTS_FILE = path.join(DATABASE_DIR, 'customReacts.json');
 const REMINDERS_FILE = path.join(DATABASE_DIR, 'reminders.json');
 const CMD_NOT_FOUND_FILE = path.join(DONO_DIR, 'cmdNotFound.json');
@@ -82,6 +83,7 @@ export {
   ECONOMY_FILE,
   MSGPREFIX_FILE,
   MSGBOTON_FILE,
+  AUTOREV_FILE,
   CUSTOM_REACTS_FILE,
   REMINDERS_FILE,
   CMD_NOT_FOUND_FILE,

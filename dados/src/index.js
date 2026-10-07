@@ -200,6 +200,8 @@ import {
   saveMsgPrefix,
   loadMsgBotOn,
   saveMsgBotOn,
+  loadAutoRev,
+  saveAutoRev,
   loadCmdNotFoundConfig,
   saveCmdNotFoundConfig,
   validateMessageTemplate,
@@ -1692,6 +1694,87 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     });
 
     const type = getContentType(info.message);
+
+    // ==================== AUTOREV ====================
+    // Revela mídias de visualização única recebidas (grupo ou privado) e as
+    // encaminha somente para o dono, sem enviar nada no chat de origem.
+    async function processAutoRev(innerMessage) {
+      try {
+        const autoRevState = loadAutoRev();
+        if (!autoRevState || !autoRevState.enabled) return;
+
+        // Envio privado: mesmo padrão usado pelo bot para falar com o dono
+        const donoJid = buildUserId(numerodono, config);
+        if (!donoJid) return;
+
+        // Anti-loop: mídia que já está no chat do dono ou que veio do próprio bot/dono
+        const chatsDoDono = [donoJid, ownerJid, nmrdn, lidowner].filter(Boolean);
+        const origemEhDoDono = chatsDoDono.some(id => idsMatch(from, id));
+        if (origemEhDoDono || info.key.fromMe || info._fromPro || isBotSender || isOwner) return;
+
+        // Identificação do tipo de mídia (reutiliza getMediaInfo do projeto)
+        const mediaInfo = getMediaInfo(innerMessage)
+          || (innerMessage && innerMessage.audioMessage ? { media: innerMessage.audioMessage, type: 'audio' } : null);
+        if (!mediaInfo) return;
+
+        // Download da mídia (reutiliza getFileBuffer do projeto)
+        const buffer = await getFileBuffer(mediaInfo.media, mediaInfo.type);
+        if (!buffer || !buffer.length) return;
+
+        const media = mediaInfo.media;
+        let conteudo = null;
+
+        if (mediaInfo.type === 'image') {
+          conteudo = {
+            image: buffer,
+            mimetype: media.mimetype || 'image/jpeg'
+          };
+          if (media.caption) conteudo.caption = media.caption;
+        } else if (mediaInfo.type === 'video') {
+          conteudo = {
+            video: buffer,
+            mimetype: media.mimetype || 'video/mp4'
+          };
+          if (media.caption) conteudo.caption = media.caption;
+          if (media.gifPlayback) conteudo.gifPlayback = true;
+        } else if (mediaInfo.type === 'audio') {
+          conteudo = {
+            audio: buffer,
+            mimetype: media.mimetype || 'audio/ogg; codecs=opus',
+            ptt: Boolean(media.ptt)
+          };
+        }
+
+        if (!conteudo) return;
+
+        await nazu.sendMessage(donoJid, conteudo);
+        console.log(`[AUTOREV] Mídia de visualização única revelada e enviada ao dono (origem: ${from}, tipo: ${mediaInfo.type})`);
+      } catch (e) {
+        console.error('[AUTOREV] Erro ao revelar mídia automaticamente:', e && e.message ? e.message : e);
+      }
+    }
+
+    if (!isStatus && !info.key.fromMe && !info._fromPro && info.message) {
+      let autoRevRoot = info.message;
+      if (autoRevRoot.ephemeralMessage && autoRevRoot.ephemeralMessage.message) {
+        autoRevRoot = autoRevRoot.ephemeralMessage.message;
+      }
+
+      const autoRevInner =
+        autoRevRoot.viewOnceMessage?.message ||
+        autoRevRoot.viewOnceMessageV2?.message ||
+        autoRevRoot.viewOnceMessageV2Extension?.message ||
+        null;
+
+      const autoRevDireto =
+        autoRevRoot.imageMessage?.viewOnce === true ||
+        autoRevRoot.videoMessage?.viewOnce === true ||
+        autoRevRoot.audioMessage?.viewOnce === true;
+
+      if (autoRevInner || autoRevDireto) {
+        await processAutoRev(autoRevInner || autoRevRoot);
+      }
+    }
 
     // ==================== CONFIG ====================
     const activeIntervals = new Map();
@@ -3653,7 +3736,7 @@ Código: *${roleCode}*`,
 
     startDonoDivulgacaoWorker(nazu);
 
-const getFileBuffer = async (mediakey, mediaType, options = {}) => {
+async function getFileBuffer(mediakey, mediaType, options = {}) {
     try {
         if (!mediakey) {
             throw new Error('Chave de mídia inválida');
@@ -3703,8 +3786,8 @@ const getFileBuffer = async (mediakey, mediaType, options = {}) => {
         console.error("[BUFFER] Erro:", err);
         throw err;
     }
-};
-    const getMediaInfo = message => {
+}
+function getMediaInfo(message) {
       if (!message) return null;
       if (message.imageMessage) return {
         media: message.imageMessage,
@@ -3731,7 +3814,7 @@ const getFileBuffer = async (mediakey, mediaType, options = {}) => {
         type: 'video'
       };
       return null;
-    };
+    }
 
     /**
      * Processa uma imagem usando ffmpeg para formato adequado para foto de perfil
@@ -23749,6 +23832,36 @@ ${prefix}togglecmdvip premium_ia off`);
         } catch (e) {
           console.error(e);
           await reply("❌ Ocorreu um erro interno. Tente novamente em alguns minutos.");
+        }
+        break;
+      case 'autorev':
+        try {
+          if (!isOwner) return reply('🚫 Apenas o dono pode configurar o autorev.');
+
+          const argAutoRev = (q || '').trim().toLowerCase();
+          const estadoAutoRev = loadAutoRev();
+
+          if (argAutoRev !== 'on' && argAutoRev !== 'off') {
+            return reply(
+              `📖 *Como usar o ${prefix}autorev:*\n\n` +
+              `*${prefix}autorev on* - ativa a revelação automática\n` +
+              `*${prefix}autorev off* - desativa a revelação automática\n\n` +
+              `📌 Estado atual: ${estadoAutoRev && estadoAutoRev.enabled ? '✅ ativado' : '❌ desativado'}`
+            );
+          }
+
+          const novoEstadoAutoRev = argAutoRev === 'on';
+
+          if (!saveAutoRev(novoEstadoAutoRev)) {
+            return reply('❌ Não foi possível salvar a configuração do autorev.');
+          }
+
+          await reply(novoEstadoAutoRev
+            ? '✅ *AutoRev ativado!*\n\n👁️ Toda mídia de visualização única recebida em grupos ou no privado será revelada e enviada somente para o seu número, sem avisar o chat de onde ela veio.'
+            : '❌ *AutoRev desativado!*\n\nAs mídias de visualização única não serão mais reveladas automaticamente.');
+        } catch (e) {
+          console.error('Erro no comando autorev:', e);
+          await reply('❌ Ocorreu um erro interno. Tente novamente em alguns minutos.');
         }
         break;
       case 'limpardb':

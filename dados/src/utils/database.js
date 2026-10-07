@@ -23,6 +23,7 @@ import {
   ECONOMY_FILE,
   MSGPREFIX_FILE,
   MSGBOTON_FILE,
+  AUTOREV_FILE,
   CUSTOM_REACTS_FILE,
   REMINDERS_FILE,
   CMD_NOT_FOUND_FILE,
@@ -350,6 +351,7 @@ https://whatsapp.com/channel/0029Vb7bjAK7j6gEdyp6g13D
 
 _Para desativar esta mensagem de inicialização, use o comando *msgboton*_`
 });
+ensureJsonFileExists(AUTOREV_FILE, { enabled: false });
 ensureJsonFileExists(CUSTOM_REACTS_FILE, { reacts: [] });
 ensureJsonFileExists(REMINDERS_FILE, { reminders: [] });
 ensureJsonFileExists(CMD_NOT_FOUND_FILE, {
@@ -545,6 +547,29 @@ const saveMsgBotOn = (enabled, message = null) => {
     return true;
   } catch (error) {
     console.error('❌ Erro ao salvar msgboton:', error);
+    return false;
+  }
+};
+
+// ============== AUTO-REV (revelação automática de visualização única) ==============
+const loadAutoRev = () => {
+  return loadJsonFile(AUTOREV_FILE, { enabled: false });
+};
+
+const saveAutoRev = (enabled) => {
+  try {
+    ensureDirectoryExists(DONO_DIR);
+    const currentData = loadAutoRev();
+
+    const newData = {
+      ...currentData,
+      enabled: Boolean(enabled)
+    };
+
+    fs.writeFileSync(AUTOREV_FILE, JSON.stringify(newData, null, 2));
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao salvar autorev:', error);
     return false;
   }
 };
@@ -3277,6 +3302,8 @@ export {
   saveMsgPrefix,
   loadMsgBotOn,
   saveMsgBotOn,
+  loadAutoRev,
+  saveAutoRev,
   loadCmdNotFoundConfig,
   saveCmdNotFoundConfig,
   validateMessageTemplate,
