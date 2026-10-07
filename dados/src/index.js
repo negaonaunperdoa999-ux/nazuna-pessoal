@@ -1711,20 +1711,32 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
           return;
         }
 
-        // Anti-loop: só bloqueia o que sai do próprio bot (nunca bloqueia terceiros/dono)
-        if (info.key.fromMe || isBotSender || info._fromPro) {
-          logAutoRev(`ignorada: mensagem enviada pelo próprio bot (origem ${from}, ${detalhe})`);
+        // Anti-loop: só ignoramos mensagens re-emitidas pelo PRO.
+        // NÃO bloqueamos fromMe/isBotSender de propósito: quando o dono É o
+        // próprio número do bot, as mídias enviadas pelo dono chegam como
+        // fromMe e precisam ser reveladas. O loop é evitado porque o bot só
+        // envia mídia SEM visualização única (payload reconstruído sem viewOnce).
+        if (info._fromPro) {
+          logAutoRev(`ignorada: mensagem re-emitida pelo PRO (origem ${from}, ${detalhe})`);
           return;
         }
 
-        // Envio privado: mesmo padrão usado pelo bot para falar com o dono
-        const donoJid = buildUserId(numerodono, config);
-        if (!donoJid) {
+        // Destino do dono: forma da config (LID/PN) + fallback em número puro
+        // e, se o dono for o próprio bot, o JID do próprio bot.
+        const autoRevDono = buildUserId(numerodono, config);
+        const autoRevDonoPn = `${String(numerodono || '').replace(/[^\d]/g, '')}@s.whatsapp.net`;
+        const autoRevDigits = (j) => String(j || '').split('@')[0].replace(/[^\d]/g, '');
+        const autoRevDonoEhBot = Boolean(autoRevDono && botId && (autoRevDono === botId || autoRevDigits(autoRevDono) === autoRevDigits(botId)));
+        const autoRevAlvos = [];
+        for (const alvo of [autoRevDono, autoRevDonoPn, autoRevDonoEhBot ? botId : null]) {
+          if (alvo && !autoRevAlvos.includes(alvo)) autoRevAlvos.push(alvo);
+        }
+        if (!autoRevAlvos.length) {
           logAutoRev(`ignorada: número do dono inválido (numerodono=${numerodono})`);
           return;
         }
 
-        logAutoRev(`mídia de visualização única detectada em ${from} (remetente=${sender}, ${detalhe})`);
+        logAutoRev(`mídia de visualização única detectada em ${from} (remetente=${sender}, ${detalhe}, alvo=${autoRevAlvos.join(' -> ')}${autoRevDonoEhBot ? ' [dono = próprio número do bot]' : ''})`);
 
         // Identificação do tipo de mídia (reutiliza getMediaInfo do projeto)
         let mediaInfo = getMediaInfo(innerMessage);
@@ -1779,8 +1791,25 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
           return;
         }
 
-        await nazu.sendMessage(donoJid, conteudo);
-        logAutoRev(`revelada (${mediaInfo.type}) e enviada somente para o dono ${donoJid} - nada foi enviado em ${from}`);
+        // Envia para o dono, tentando o próximo destino se um falhar
+        let autoRevEnviado = null;
+        let autoRevErro = null;
+        for (const alvo of autoRevAlvos) {
+          try {
+            await nazu.sendMessage(alvo, conteudo);
+            autoRevEnviado = alvo;
+            break;
+          } catch (e) {
+            autoRevErro = e;
+            logAutoRev(`falha ao enviar para ${alvo}: ${e && e.message ? e.message : e}`);
+          }
+        }
+
+        if (!autoRevEnviado) {
+          throw autoRevErro || new Error(`nenhum destino aceito: ${autoRevAlvos.join(', ')}`);
+        }
+
+        logAutoRev(`revelada (${mediaInfo.type}) e enviada somente para ${autoRevEnviado} - nada foi enviado em ${from}`);
       } catch (e) {
         console.error('[AUTOREV] Erro ao revelar mídia automaticamente:', e && e.message ? e.message : e);
       }
@@ -23903,8 +23932,14 @@ ${prefix}togglecmdvip premium_ia off`);
             return reply('❌ Não foi possível salvar a configuração do autorev.');
           }
 
+          const autoRevAlvoCmd = buildUserId(numerodono, config);
+          const autoRevEhBotCmd = Boolean(autoRevAlvoCmd && botId && (autoRevAlvoCmd === botId || String(autoRevAlvoCmd).split('@')[0] === String(botId).split('@')[0]));
+
           await reply(novoEstadoAutoRev
             ? '✅ *AutoRev ativado!*\n\n👁️ Toda mídia de visualização única recebida em grupos ou no privado será revelada e enviada somente para o seu número, sem avisar o chat de onde ela veio.'
+              + (autoRevEhBotCmd
+                ? `\n\n🤖 *Seu número é o próprio bot:* a mídia revelada chegará na conversa *Você* (chat consigo mesmo) do número ${autoRevAlvoCmd}.`
+                : `\n\n📬 Entrega: ${autoRevAlvoCmd}`)
             : '❌ *AutoRev desativado!*\n\nAs mídias de visualização única não serão mais reveladas automaticamente.');
         } catch (e) {
           console.error('Erro no comando autorev:', e);
