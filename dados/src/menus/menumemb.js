@@ -9,7 +9,7 @@ export default async function menuMembros(prefix, botName = "MeuBot", userName =
     perfilMenuTitle = "👤 PERFIL & ESTATÍSTICAS",
     botStatusMenuTitle = "🤖 STATUS DO BOT",
     personalMenuTitle = "⚙️ CONFIGURAÇÕES PESSOAIS",
-    rankMenuTitle = "?? RANKINGS & GAMIFICA��O",
+    rankMenuTitle = "🏆 RANKINGS & GAMIFICAÇÃO",
     gamingMenuTitle = "🎮 CONTEÚDO GAMER"
 } = {}) {
     const formattedHeader = header.replace(/#user#/g, userName);
@@ -38,7 +38,7 @@ ${middleBorder}${menuItemIcon}${prefix}afk
 ${middleBorder}${menuItemIcon}${prefix}voltei
 ${bottomBorder}
 
-${menuTopBorder}${separatorIcon} *?? INTERA��O SOCIAL*
+${menuTopBorder}${separatorIcon} *👬 INTERAÇÃO SOCIAL*
 ${middleBorder}
 ${middleBorder}${menuItemIcon}${prefix}roles
 ${middleBorder}${menuItemIcon}${prefix}transcrever
@@ -68,7 +68,7 @@ ${middleBorder}${menuItemIcon}${prefix}presente @user <tipo>
 ${middleBorder}${menuItemIcon}${prefix}inv
 ${bottomBorder}
 
-${menuTopBorder}${separatorIcon} *? REPUTA��O & DEN�NCIAS*
+${menuTopBorder}${separatorIcon} *⭐ REPUTAÇÃO & DENÚNCIAS*
 ${middleBorder}
 ${middleBorder}${menuItemIcon}${prefix}rep + @user
 ${middleBorder}${menuItemIcon}${prefix}rep - @user

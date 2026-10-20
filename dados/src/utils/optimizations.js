@@ -3,7 +3,7 @@
  * Funções auxiliares para melhorar a performance do bot
  */
 
-// ==================== MEMOIZA��O ====================
+// ==================== MEMOIZAÇÃO ====================
 
 /**
  * Cria uma versão memoizada de uma função
@@ -142,7 +142,7 @@ export async function parallelMap(array, asyncFn, concurrency = 5) {
   return Promise.all(results);
 }
 
-// ==================== OTIMIZA��O DE STRINGS ====================
+// ==================== OTIMIZAÇÃO DE STRINGS ====================
 
 /**
  * Pool de strings para reduzir alocações de memória
@@ -199,7 +199,7 @@ export function lazyLoad(modulePath) {
   };
 }
 
-// ==================== CACHE COM EXPIRA��O ====================
+// ==================== CACHE COM EXPIRAÇÃO ====================
 
 export class ExpiringCache {
   constructor(defaultTtl = 60000) {

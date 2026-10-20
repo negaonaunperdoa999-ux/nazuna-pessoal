@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Sistema de otimização de performance
  * Cacheia dados estáticos e otimiza operações frequentes
- * N�O cacheia dados cr�ticos (economy, leveling)
+ * NÃO cacheia dados críticos (economy, leveling)
  */
 class PerformanceOptimizer {
   constructor() {
@@ -272,7 +272,7 @@ class PerformanceOptimizer {
 
   /**
    * Cacheia dados de grupo com TTL curto (5-10 segundos)
-   * N�O cacheia economy/leveling
+   * NÃO cacheia economy/leveling
    */
   async getGroupDataCached(groupId, loader, ttl = 5000) {
     const cacheKey = `group:${groupId}`;

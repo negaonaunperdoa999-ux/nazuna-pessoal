@@ -6,7 +6,7 @@ async function menuSticker(prefix, botName = "MeuBot", userName = "Usuário", {
     menuItemIcon = "•.̇𖥨֗💜⭟",
     separatorIcon = "❁",
     middleBorder = "┊",
-    createStickerMenuTitle = "?? CRIA��O DE FIGURINHAS",
+    createStickerMenuTitle = "🎨 CRIAÇÃO DE FIGURINHAS",
     managementMenuTitle = "⚙️ GERENCIAMENTO DE FIGURINHAS"
 } = {}) {
     const formattedHeader = header.replace(/#user#/g, userName);

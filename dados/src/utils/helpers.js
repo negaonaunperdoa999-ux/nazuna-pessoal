@@ -212,7 +212,7 @@ const normalizar = (texto, keepCase = false) => {
 };
 
 /**
- * Normaliza par�metro de comando para compara��o
+ * Normaliza parâmetro de comando para comparação
  * Remove acentos, espaços extras, converte para minúsculas
  */
 const normalizeParam = (param) => {
@@ -276,7 +276,7 @@ const findInArrayIgnoringAccents = (arr, searchItem) => {
 };
 
 /**
- * Aliases/varia��es comuns de par�metros
+ * Aliases/variações comuns de parâmetros
  */
 const PARAM_ALIASES = {
   // Pets
@@ -346,7 +346,7 @@ const PARAM_ALIASES = {
 };
 
 /**
- * Resolve um par�metro para sua forma can�nica usando aliases
+ * Resolve um parâmetro para sua forma canônica usando aliases
  */
 const resolveParamAlias = (input) => {
   if (!input) return null;
@@ -365,7 +365,7 @@ const resolveParamAlias = (input) => {
 };
 
 /**
- * Verifica se um par�metro corresponde a uma das op��es v�lidas
+ * Verifica se um parâmetro corresponde a uma das opções válidas
  * Retorna a opção válida encontrada ou null
  */
 const matchParam = (input, validOptions) => {
@@ -946,7 +946,7 @@ export {
   validateLevelingUser,
   validateEconomyUser,
   validateGroupData,
-  // Fun��es de normaliza��o de par�metros
+  // Funções de normalização de parâmetros
   normalizeParam,
   compareParams,
   findKeyIgnoringAccents,
@@ -1202,43 +1202,43 @@ function validateParamValue(value, def = {}) {
     value = def.default;
   }
   if ((typeof value === 'undefined' || value === null || value === '') && def.required) {
-    return { ok: false, message: `Par�metro ${def.name} � obrigat�rio.` };
+    return { ok: false, message: `Parâmetro ${def.name} é obrigatório.` };
   }
   if (typeof value === 'undefined' || value === null || value === '') return { ok: true };
   switch (t) {
     case 'int': {
       const n = Number(value);
-      if (isNaN(n) || !Number.isInteger(n)) return { ok: false, message: `Par�metro ${def.name} deve ser um inteiro.` };
-      if (def.min !== undefined && n < def.min) return { ok: false, message: `Par�metro ${def.name} deve ser >= ${def.min}.` };
-      if (def.max !== undefined && n > def.max) return { ok: false, message: `Par�metro ${def.name} deve ser <= ${def.max}.` };
+      if (isNaN(n) || !Number.isInteger(n)) return { ok: false, message: `Parâmetro ${def.name} deve ser um inteiro.` };
+      if (def.min !== undefined && n < def.min) return { ok: false, message: `Parâmetro ${def.name} deve ser >= ${def.min}.` };
+      if (def.max !== undefined && n > def.max) return { ok: false, message: `Parâmetro ${def.name} deve ser <= ${def.max}.` };
       return { ok: true };
     }
     case 'float':
     case 'number': {
       const n = Number(value);
-      if (isNaN(n)) return { ok: false, message: `Par�metro ${def.name} deve ser num�rico.` };
-      if (def.min !== undefined && n < def.min) return { ok: false, message: `Par�metro ${def.name} deve ser >= ${def.min}.` };
-      if (def.max !== undefined && n > def.max) return { ok: false, message: `Par�metro ${def.name} deve ser <= ${def.max}.` };
+      if (isNaN(n)) return { ok: false, message: `Parâmetro ${def.name} deve ser numérico.` };
+      if (def.min !== undefined && n < def.min) return { ok: false, message: `Parâmetro ${def.name} deve ser >= ${def.min}.` };
+      if (def.max !== undefined && n > def.max) return { ok: false, message: `Parâmetro ${def.name} deve ser <= ${def.max}.` };
       return { ok: true };
     }
     case 'boolean': {
       const lv = ('' + value).toLowerCase();
       if (!['true', 'false', '1', '0', 'yes', 'no', 'sim', 'nao', 'não'].includes(lv)) {
-        return { ok: false, message: `Par�metro ${def.name} deve ser booleano (true/false).` };
+        return { ok: false, message: `Parâmetro ${def.name} deve ser booleano (true/false).` };
       }
       return { ok: true };
     }
     case 'regex': {
       try {
         const re = new RegExp(def.pattern);
-        return re.test(value) ? { ok: true } : { ok: false, message: `Par�metro ${def.name} n�o corresponde ao padr�o.` };
+        return re.test(value) ? { ok: true } : { ok: false, message: `Parâmetro ${def.name} não corresponde ao padrão.` };
       } catch (e) {
         return { ok: false, message: `Padrão regex inválido: ${def.pattern}` };
       }
     }
     case 'enum': {
       if (Array.isArray(def.enum) && def.enum.length && !def.enum.includes(value)) {
-        return { ok: false, message: `Par�metro ${def.name} deve ser um de: ${def.enum.join(', ')}` };
+        return { ok: false, message: `Parâmetro ${def.name} deve ser um de: ${def.enum.join(', ')}` };
       }
       return { ok: true };
     }

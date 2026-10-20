@@ -1,4 +1,4 @@
-// --- EDI��O DE �UDIO ---
+// --- EDIÇÃO DE ÁUDIO ---
 // Cortar áudio, alterar velocidade
 import { exec } from 'child_process';
 import { promisify } from 'util';

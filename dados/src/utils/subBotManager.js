@@ -90,7 +90,7 @@ function createSubBotConfig(botId, phoneNumber, ownerNumber) {
 }
 
 /**
- * Inicializa uma inst�ncia de sub-bot
+ * Inicializa uma instância de sub-bot
  */
 async function initializeSubBot(botId, phoneNumber, ownerNumber, generatePairingCode = false) {
     try {

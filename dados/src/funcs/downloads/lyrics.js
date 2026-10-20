@@ -61,7 +61,7 @@ async function getLyrics(topic) {
     const lyrics = music.lyrics || 'Letra não disponível';
     const link = music.link || '';
 
-    // ?? CORRE��O PRINCIPAL AQUI
+    // 🔥 CORREÇÃO PRINCIPAL AQUI
     let image = null;
 
     if (typeof music.img === 'string' && music.img.trim() !== '') {
@@ -80,7 +80,7 @@ async function getLyrics(topic) {
 ${lyrics}
 `.trim();
 
-    // ?? N�O retorna image se for null
+    // 🔥 NÃO retorna image se for null
     if (image) {
       return { text, image };
     }

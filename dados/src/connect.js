@@ -700,7 +700,7 @@ if (groupSettings?.x9 && inf.author && !entradaPorLink) {
                         CaptchaIndex.add(typeIds, from, answer, expiresAt, participantNumber);
 
                         await NazunaSock.sendMessage(from, {
-                            text: `?? *VERIFICA��O*\n\nOl� @${participantNumber}\n\n? ${num1} + ${num2} = ?\n\n?? 5 minutos.`,
+                            text: `?? *VERIFICAÇÃO*\n\nOlá @${participantNumber}\n\n? ${num1} + ${num2} = ?\n\n?? 5 minutos.`,
                             mentions: [`${participantNumber}@s.whatsapp.net`]
                         });
 
@@ -934,7 +934,7 @@ if (
             CaptchaIndex.add(typeIds, from, answer, expiresAt, nome);
 
             await NazunaSock.sendMessage(from, {
-                text: `?? *VERIFICA��O DE SEGURAN�A*\n\n?? Ol� @${numero}!\n\nPara garantir que voc� n�o � um bot, resolva:\n? *${num1} + ${num2} = ?*\n\n?? Voc� tem 5 minutos ou ser� removido.`,
+                text: `🔐 *VERIFICAÇÃO DE SEGURANÇA*\n\n👋 Olá @${numero}!\n\nPara garantir que você não é um bot, resolva:\n❓ *${num1} + ${num2} = ?*\n\n⏱️ Você tem 5 minutos ou será removido.`,
                 mentions: [participantJid]
             });
         }
@@ -1465,8 +1465,8 @@ async function createBotSocket(authDir) {
                 console.log('🆔 Group ID:', inf.id || inf.jid || 'unknown');
                 console.log('⚡ Action:', inf.action);
                 console.log('👥 Participants:', inf.participants);
-                console.log('� Author:', inf.author || 'N/A');
-                console.log('�📦 Full event data:', JSON.stringify(inf, null, 2));
+                console.log('👮 Author:', inf.author || 'N/A');
+                console.log('📦 Full event data:', JSON.stringify(inf, null, 2));
                 console.log('🐛 ================================================\n');
             }
             await handleGroupParticipantsUpdate(NazunaSock, inf);
@@ -1725,7 +1725,7 @@ async function createBotSocket(authDir) {
 
 
                 if (reason === DisconnectReason.connectionReplaced) {
-                    console.log('?? Conex�o substitu�da por outra inst�ncia. N�o reconectando para evitar conflito.');
+                    console.log('⚠️ Conexão substituída por outra instância. Não reconectando para evitar conflito.');
                     return;
                 }
 

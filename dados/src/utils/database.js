@@ -1241,7 +1241,7 @@ const setGroupRental = (groupId, durationDays) => {
   if (existsNow) {
     console.log('✅ Persistência OK imediata');
   } else {
-    console.log('?? N�O persistiu imediatamente');
+    console.log('💥 NÃO persistiu imediatamente');
   }
 
 
@@ -1965,7 +1965,7 @@ function ensureEconomyDefaults(econ) {
   econ.shop = econ.shop || {};
   econ.users = econ.users || {};
 
-  // === MIGRA��O AUTOM�TICA DE USU�RIOS ===
+  // === MIGRAÇÃO AUTOMÁTICA DE USUÁRIOS ===
   // Migra todos os usuários existentes para nova estrutura
   Object.keys(econ.users).forEach(userId => {
     const oldUser = { ...econ.users[userId] };
@@ -1976,7 +1976,7 @@ function ensureEconomyDefaults(econ) {
     }
   });
 
-  // === FERRAMENTAS PADR�O ===
+  // === FERRAMENTAS PADRÃO ===
   const defs = {
     "pickaxe_bronze": { name: "Picareta de Bronze", price: 500, type: "tool", toolType: "pickaxe", tier: "bronze", durability: 20, effect: { mineBonus: 0.1 } },
     "pickaxe_ferro": { name: "Picareta de Ferro", price: 1500, type: "tool", toolType: "pickaxe", tier: "ferro", durability: 60, effect: { mineBonus: 0.25 } },
@@ -2044,7 +2044,7 @@ function ensureEconomyDefaults(econ) {
     mina_privada: { name: 'Mina Privada', price: 30000, upkeepPerDay: 400, incomeMaterialsPerDay: { pedra: 12, ferro: 3, ouro: 1 } }
   };
 
-  // === CL�S ===
+  // === CLÃS ===
   if (!econ.clans) {
     econ.clans = {};
     changed = true;
@@ -2274,7 +2274,7 @@ function isPeriodCompleted(ch) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// FUN��ES DE LEVELING COM PROTE��O
+// FUNÇÕES DE LEVELING COM PROTEÇÃO
 // ═══════════════════════════════════════════════════════════════════
 
 const DEFAULT_PATENTS = [
@@ -3431,7 +3431,7 @@ export {
   getLevelingUser,
   DEFAULT_PATENTS,
   DEFAULT_LEVELING_STRUCTURE,
-  // Fun��es de normaliza��o de par�metros
+  // Funções de normalização de parâmetros
   normalizeParam,
   compareParams,
   findKeyIgnoringAccents,

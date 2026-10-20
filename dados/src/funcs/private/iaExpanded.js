@@ -14,7 +14,7 @@ const SIGNOS = {
     aries: { emoji: '♈', nome: 'Áries', periodo: '21/03 - 19/04', elemento: '🔥 Fogo' },
     touro: { emoji: '♉', nome: 'Touro', periodo: '20/04 - 20/05', elemento: '🌍 Terra' },
     gemeos: { emoji: '♊', nome: 'Gêmeos', periodo: '21/05 - 20/06', elemento: '💨 Ar' },
-    cancer: { emoji: '?', nome: 'C�ncer', periodo: '21/06 - 22/07', elemento: '?? �gua' },
+    cancer: { emoji: '♋', nome: 'Câncer', periodo: '21/06 - 22/07', elemento: '💧 Água' },
     leao: { emoji: '♌', nome: 'Leão', periodo: '23/07 - 22/08', elemento: '🔥 Fogo' },
     virgem: { emoji: '♍', nome: 'Virgem', periodo: '23/08 - 22/09', elemento: '🌍 Terra' },
     libra: { emoji: '♎', nome: 'Libra', periodo: '23/09 - 22/10', elemento: '💨 Ar' },
@@ -30,7 +30,7 @@ const SIGNO_ALIASES = {
     'áries': 'aries', 'aries': 'aries',
     'touro': 'touro',
     'gêmeos': 'gemeos', 'gemeos': 'gemeos',
-    'c�ncer': 'cancer', 'cancer': 'cancer',
+    'câncer': 'cancer', 'cancer': 'cancer',
     'leão': 'leao', 'leao': 'leao',
     'virgem': 'virgem',
     'libra': 'libra',
@@ -61,7 +61,7 @@ O horóscopo deve incluir:
 Seja místico mas otimista. Use uma linguagem envolvente e poética.
 Formato esperado (mantenha os emojis):
 
-?? *PREVIS�O GERAL*
+🌟 *PREVISÃO GERAL*
 [previsão]
 
 ❤️ *AMOR*
@@ -146,10 +146,10 @@ Estruture assim:
 • [fato relevante 1]
 • [fato relevante 2]
 
-?? *CONCLUS�O:*
+🤔 *CONCLUSÃO:*
 [Uma conclusão equilibrada que apresente ambos os lados sem tomar partido]
 
-?? *REFLEX�O:*
+💭 *REFLEXÃO:*
 [Uma pergunta para o leitor refletir]
 
 Seja objetivo, use dados quando possível, e mantenha imparcialidade. Evite temas muito polêmicos de forma radical.`;

@@ -392,7 +392,7 @@ const convert = (value, from, to) => {
         'c-k': (v) => v + 273.15,
         'k-c': (v) => v - 273.15,
         
-        // Dist�ncia
+        // Distância
         'km-mi': (v) => v * 0.621371,
         'mi-km': (v) => v * 1.60934,
         'm-ft': (v) => v * 3.28084,
@@ -441,7 +441,7 @@ const convert = (value, from, to) => {
     return {
         success: true,
         result: parseFloat(result.toFixed(6)),
-        message: `?? *CONVERS�O*\n\n` +
+        message: `📐 *CONVERSÃO*\n\n` +
                  `${value} ${from.toUpperCase()} = ${parseFloat(result.toFixed(6))} ${to.toUpperCase()}`
     };
 };

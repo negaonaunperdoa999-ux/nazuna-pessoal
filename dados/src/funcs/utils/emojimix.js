@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// --- CONFIGURA��O ---
+// --- CONFIGURAÇÃO ---
 const CONFIG = {
     API: {
         BASE_URL: 'https://tenor.googleapis.com/v2',
@@ -33,7 +33,7 @@ class TenorClient {
             throw new EmojiMixError('Chave da API Tenor não configurada. Verifique suas variáveis de ambiente.');
         }
 
-        // Cria uma inst�ncia do Axios com configura��es padr�o
+        // Cria uma instância do Axios com configurações padrão
         this.api = axios.create({
             baseURL: CONFIG.API.BASE_URL,
             params: {
@@ -78,8 +78,8 @@ class TenorClient {
     }
 }
 
-// --- FUN��O P�BLICA ---
-// Cria uma �nica inst�ncia do cliente (padr�o Singleton) para ser usada pela fun��o
+// --- FUNÇÃO PÚBLICA ---
+// Cria uma única instância do cliente (padrão Singleton) para ser usada pela função
 const client = new TenorClient(CONFIG.API.KEY);
 
 /**

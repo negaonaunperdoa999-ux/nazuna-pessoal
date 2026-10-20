@@ -1,4 +1,4 @@
-// --- SISTEMA DE REPUTA��O E DEN�NCIAS ---
+// --- SISTEMA DE REPUTAÇÃO E DENÚNCIAS ---
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,7 +24,7 @@ const getUserName = (userId) => {
     return userId.split('@')[0] || userId;
 };
 
-// --- REPUTA��O ---
+// --- REPUTAÇÃO ---
 
 // Carregar dados de reputação
 const loadReputation = () => {
@@ -136,7 +136,7 @@ const giveRep = (fromId, toId, isPositive = true) => {
     
     return {
         success: true,
-        message: `${emoji} *REPUTA��O*\n\n` +
+        message: `${emoji} *REPUTAÇÃO*\n\n` +
                  `@${getUserName(fromId)} deu reputação ${type} para @${getUserName(toId)}!\n\n` +
                  `📊 Rep de @${getUserName(toId)}: ${total >= 0 ? '+' : ''}${total}\n` +
                  `   👍 ${receiver.positive} | 👎 ${receiver.negative}`,
@@ -161,7 +161,7 @@ const getRep = (userId) => {
     
     return {
         success: true,
-        message: `?? *REPUTA��O*\n\n` +
+        message: `📊 *REPUTAÇÃO*\n\n` +
                  `👤 @${getUserName(userId)}\n` +
                  `🏆 Rank: ${rank}\n\n` +
                  `📈 Total: ${total >= 0 ? '+' : ''}${total}\n` +
@@ -190,10 +190,10 @@ const getRepRanking = (limit = 10) => {
         .slice(0, limit);
     
     if (rankings.length === 0) {
-        return { success: true, message: '?? *RANKING DE REPUTA��O*\n\nNenhum usu�rio com reputa��o ainda!' };
+        return { success: true, message: '📊 *RANKING DE REPUTAÇÃO*\n\nNenhum usuário com reputação ainda!' };
     }
     
-    let message = '?? *RANKING DE REPUTA��O*\n\n';
+    let message = '📊 *RANKING DE REPUTAÇÃO*\n\n';
     rankings.forEach((user, i) => {
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
         const sign = user.total >= 0 ? '+' : '';

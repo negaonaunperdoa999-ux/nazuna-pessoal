@@ -421,7 +421,7 @@ class OptimizedCacheManager {
     }
 
     /**
-     * Configura par�metros de otimiza��o
+     * Configura parâmetros de otimização
      */
     configure(options = {}) {
         if (options.memoryThreshold !== undefined) {

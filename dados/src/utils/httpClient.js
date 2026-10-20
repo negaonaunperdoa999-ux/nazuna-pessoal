@@ -1,9 +1,9 @@
 /**
  * HTTP Client Compartilhado com Connection Pooling
  * 
- * Este m�dulo fornece uma inst�ncia axios otimizada com:
+ * Este módulo fornece uma instância axios otimizada com:
  * - Keep-Alive habilitado para reutilização de conexões
- * - Limita��o de sockets simult�neos
+ * - Limitação de sockets simultâneos
  * - Timeouts configuráveis
  * - Headers padrão para APIs
  * 
@@ -18,7 +18,7 @@ import https from 'https';
 // Agentes HTTP com keep-alive e limitação de conexões
 const httpAgent = new http.Agent({
   keepAlive: true,
-  maxSockets: 50,        // M�ximo de sockets simult�neos por host
+  maxSockets: 50,        // Máximo de sockets simultâneos por host
   maxFreeSockets: 10,    // Máximo de sockets livres mantidos
   timeout: 120000,       // Timeout de socket ocioso (2 minutos)
   scheduling: 'lifo'     // Last-in-first-out para melhor reutilização

@@ -15,7 +15,7 @@ export default async function menuAlterador(prefix, botName = "MeuBot", userName
 
 ${menuTopBorder}${separatorIcon} *${videoMenuTitle}*
 ${middleBorder}
-${middleBorder}${menuTitleIcon} *EDI��O B�SICA* ${menuTitleIcon}
+${middleBorder}${menuTitleIcon} *EDIÇÃO BÁSICA* ${menuTitleIcon}
 ${middleBorder}${menuItemIcon}${prefix}cortarvideo <inicio> <fim>
 ${middleBorder}${menuItemIcon}${prefix}tomp3 - Converter para áudio
 ${middleBorder}
@@ -44,7 +44,7 @@ ${bottomBorder}
 
 ${menuTopBorder}${separatorIcon} *${audioMenuTitle}*
 ${middleBorder}
-${middleBorder}${menuTitleIcon} *EDI��O B�SICA* ${menuTitleIcon}
+${middleBorder}${menuTitleIcon} *EDIÇÃO BÁSICA* ${menuTitleIcon}
 ${middleBorder}${menuItemIcon}${prefix}cortaraudio <inicio> <fim>
 ${middleBorder}${menuItemIcon}${prefix}velocidade <0.5-3.0>
 ${middleBorder}${menuItemIcon}${prefix}speed <0.5-3.0>
@@ -89,7 +89,7 @@ ${middleBorder}${menuItemIcon}${prefix}flanger
 ${middleBorder}${menuItemIcon}${prefix}tremolo
 ${middleBorder}${menuItemIcon}${prefix}vibrato
 ${middleBorder}
-${middleBorder}${menuTitleIcon} *VOLUME & EQUALIZA��O* ${menuTitleIcon}
+${middleBorder}${menuTitleIcon} *VOLUME & EQUALIZAÇÃO* ${menuTitleIcon}
 ${middleBorder}${menuItemIcon}${prefix}volumeboost
 ${middleBorder}${menuItemIcon}${prefix}aumentarvolume
 ${middleBorder}${menuItemIcon}${prefix}equalizer

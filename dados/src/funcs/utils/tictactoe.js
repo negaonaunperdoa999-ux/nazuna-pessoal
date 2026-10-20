@@ -1,4 +1,4 @@
-// --- CONFIGURA��O ---
+// --- CONFIGURAÇÃO ---
 const CONFIG = {
     INVITATION_TIMEOUT_MS: 15 * 60 * 1000,
     GAME_TIMEOUT_MS: 30 * 60 * 1000,
@@ -216,7 +216,7 @@ class GameManager {
     }
 }
 
-// --- EXPORTA��O DIRETA DAS FUN��ES ---
+// --- EXPORTAÇÃO DIRETA DAS FUNÇÕES ---
 const manager = new GameManager();
 
 const invitePlayer = (...args) => manager.invitePlayer(...args);

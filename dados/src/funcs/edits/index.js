@@ -60,7 +60,7 @@ async function geraredit({ query, type }) {
 
   try {
     if (!query || !type) {
-      return { ok: false, msg: '? Par�metros obrigat�rios n�o informados.' };
+      return { ok: false, msg: '❌ Parâmetros obrigatórios não informados.' };
     }
 
     const cacheKey = `edit:${type}:${query}`;

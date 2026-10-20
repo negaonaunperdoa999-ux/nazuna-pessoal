@@ -59,7 +59,7 @@ const saveAntitoxic = (data) => {
     }
 };
 
-// --- CONFIGURA��O DO GRUPO ---
+// --- CONFIGURAÇÃO DO GRUPO ---
 
 const enableAntitoxic = (groupId, action = CONFIG.DEFAULT_ACTION) => {
     if (!CONFIG.ACTIONS.includes(action)) {
@@ -173,7 +173,7 @@ const getAntitoxicStatus = (groupId) => {
     };
 };
 
-// --- DETEC��O ---
+// --- DETECÇÃO ---
 
 // Detecção rápida por palavras-chave (fallback)
 const quickCheck = (message) => {

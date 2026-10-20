@@ -29,7 +29,7 @@ function loadJsonSync(filePath) {
 
 /**
  * Inicializa e retorna o objeto de módulos agregados.
- * Usa import() din�mico para m�dulos ESM e mant�m a mesma "shape" p�blica anterior.
+ * Usa import() dinâmico para módulos ESM e mantém a mesma "shape" pública anterior.
  */
 let modulesPromise;
 

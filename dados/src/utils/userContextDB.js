@@ -629,7 +629,7 @@ class UserContextDB {
   }
 }
 
-// Inst�ncia �nica (singleton)
+// Instância única (singleton)
 const userContextDB = new UserContextDB();
 
 export default userContextDB;

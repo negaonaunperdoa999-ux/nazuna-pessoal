@@ -251,7 +251,7 @@ class RentalExpirationManager {
         break;
 
       default:
-        header = '?? INFORMA��O';
+        header = '📢 INFORMAÇÃO';
         message = `Atualização sobre o status do aluguel do grupo *${groupName}*`;
         instructions = 'Verifique as informações abaixo.';
     }

@@ -321,7 +321,7 @@ const clearBlacklist = (groupId) => {
     };
 };
 
-// --- VERIFICA��O DE MENSAGENS ---
+// --- VERIFICAÇÃO DE MENSAGENS ---
 
 /**
  * Verifica se uma mensagem contém palavras da blacklist

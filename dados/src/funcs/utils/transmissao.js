@@ -1,4 +1,4 @@
-// --- SISTEMA DE TRANSMISS�O (BROADCAST LIST) ---
+// --- SISTEMA DE TRANSMISSÃO (BROADCAST LIST) ---
 // Permite que usuários se inscrevam para receber transmissões do dono
 import fs from 'fs';
 import path from 'path';

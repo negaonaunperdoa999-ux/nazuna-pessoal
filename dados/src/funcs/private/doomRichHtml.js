@@ -1,4 +1,4 @@
-﻿import { readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { buildAIRichMessageContent, checkAirichPayloadWithinLimit, createId, logAirichPayloadStats } from './airich/sendAIRichHtml.js';
 import { buildDoomOrientationCss, buildDoomOrientationScript } from './doom/doomOrientation.js';
 

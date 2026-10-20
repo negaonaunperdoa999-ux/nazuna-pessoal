@@ -127,7 +127,7 @@ class RelationshipManager {
       };
     }
 
-    // ===== CORRE��O: Verifica se o solicitante j� est� em outro relacionamento =====
+    // ===== CORREÇÃO: Verifica se o solicitante já está em outro relacionamento =====
     const requesterActivePair = this.getActivePairForUser(requesterId);
     if (requesterActivePair && this._normalizeId(requesterActivePair.partnerId) !== target) {
       const partnerName = getUserName(requesterActivePair.partnerId);
@@ -139,7 +139,7 @@ class RelationshipManager {
       };
     }
 
-    // ===== CORRE��O: Verifica se o alvo j� est� em outro relacionamento =====
+    // ===== CORREÇÃO: Verifica se o alvo já está em outro relacionamento =====
     const targetActivePair = this.getActivePairForUser(targetId);
     if (targetActivePair && this._normalizeId(targetActivePair.partnerId) !== requester) {
       const partnerName = getUserName(targetActivePair.partnerId);
@@ -475,7 +475,7 @@ class RelationshipManager {
       const casamentoSince = Date.parse(stageInfo.since);
       if (!Number.isNaN(namoroSince) && !Number.isNaN(casamentoSince)) {
         const namoroDuration = casamentoSince - namoroSince;
-        lines.push(`� Tempo de namoro antes do casamento: ${this._formatDuration(namoroDuration)}`);
+        lines.push(`Tempo de namoro antes do casamento: ${this._formatDuration(namoroDuration)}`);
       }
     }
 
@@ -803,7 +803,7 @@ class RelationshipManager {
 
     return {
       success: true,
-      message: `?? *PROPOSTA DE TRAI��O*\n\n@${traitorName} quer trair @${victimName} com voc�, @${targetName}!\n\n? Aceitar: "sim"\n? Recusar: "n�o"\n\n? Expira em ${this._formatDuration(REQUEST_TIMEOUT_MS)}.`,
+      message: `😈 *PROPOSTA DE TRAIÇÃO*\n\n@${traitorName} quer trair @${victimName} com você, @${targetName}!\n\n✅ Aceitar: "sim"\n❌ Recusar: "não"\n\n⏳ Expira em ${this._formatDuration(REQUEST_TIMEOUT_MS)}.`,
       mentions: [userId, targetId, partnerId]
     };
   }
@@ -873,7 +873,7 @@ class RelationshipManager {
     const accompliceName = getUserName(targetId);
 
     const lines = [
-      '?? *TRAI��O CONFIRMADA!*',
+      '😈 *TRAIÇÃO CONFIRMADA!*',
       '',
       `💔 @${traitorName} traiu @${victimName}!`,
       `👤 Cúmplice: @${accompliceName} aceitou participar!`,

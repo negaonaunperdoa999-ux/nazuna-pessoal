@@ -6,8 +6,8 @@ export default async function menuadm(prefix, botName = "MeuBot", userName = "Us
     menuItemIcon = "•.̇𖥨֗💜⭟",
     separatorIcon = "❁",
     middleBorder = "┊",
-    adminMenuTitle = "??? GEST�O DE USU�RIOS",
-    managementMenuTitle = "?? GEST�O DO GRUPO",
+    adminMenuTitle = "🛡️ GESTÃO DE USUÁRIOS",
+    managementMenuTitle = "💬 GESTÃO DO GRUPO",
     securityMenuTitle = "🔒 SEGURANÇA",
     moderatorsMenuTitle = "👥 MODERADORES",
     partnershipsMenuTitle = "🤝 PARCERIAS",
@@ -112,7 +112,7 @@ ${middleBorder}${menuItemIcon}${prefix}addparceria
 ${middleBorder}${menuItemIcon}${prefix}delparceria
 ${bottomBorder}
 
-${menuTopBorder}${separatorIcon} *?? SEGURAN�A & PROTE��O*
+${menuTopBorder}${separatorIcon} *🔒 SEGURANÇA & PROTEÇÃO*
 ${middleBorder}
 ${middleBorder}${menuItemIcon}${prefix}anticategoria [categoria]
 ${middleBorder}${menuItemIcon}${prefix}antiflood

@@ -59,7 +59,7 @@ async function gerarLogo({ query, type }) {
 
   try {
     if (!query || !type) {
-      return { ok: false, msg: '? Par�metros obrigat�rios n�o informados.' };
+      return { ok: false, msg: '❌ Parâmetros obrigatórios não informados.' };
     }
 
     const cacheKey = `logo:${type}:${query}`;
@@ -97,7 +97,7 @@ async function gerarLogo2({ query, query2, type }) {
 
   try {
     if (!query || !query2 || !type) {
-      return { ok: false, msg: '? Par�metros obrigat�rios n�o informados.' };
+      return { ok: false, msg: '❌ Parâmetros obrigatórios não informados.' };
     }
 
     const cacheKey = `logo:${type}:${query}:${query2}`;
