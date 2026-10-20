@@ -551,6 +551,7 @@ const {
   youtube,
   tiktok,
   totext,
+  tts,
   pinterest,
   igdl,
   kwai,
@@ -1123,6 +1124,14 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
   const site_vex = config.site_vex
   const debug = config.debug;
   const lidowner = config.lidowner;
+
+  let isSimilaridade = false;
+  try {
+    const globalSettings = loadJsonFile(GLOBAL_SETTINGS_FILE, {});
+    isSimilaridade = globalSettings?.ativacoes?.similaridade === true;
+  } catch {
+    isSimilaridade = false;
+  }
 
   // Sistema de degradação automática de pets
   function applyPetDegradation(pets) {
@@ -19675,11 +19684,8 @@ ${prefix}addsubbot @152656307871952`
         try {
           if (!q) return reply(`Digite um nome ou o link de um vídeo.\n> Ex: ${prefix}${command} Gato`);
 
-          // Verificar se tem API key
-
-
           reply('Aguarde um momentinho... ☀️');
-          let isTikTokUrl = q.includes('tiktok');
+          const isTikTokUrl = q.includes('tiktok.com');
           const tiktokPromise = isTikTokUrl ? tiktok.dl(q) : tiktok.search(q);
 
           tiktokPromise
@@ -19688,21 +19694,15 @@ ${prefix}addsubbot @152656307871952`
 
               const urlz = datinha.urls?.[0];
 
-              if (urlz) {
-                await nazu.sendMessage(from, {
-                  [datinha.type]: {
-                    url: urlz
-                  }
-                }, {
-                  quoted: info
-                });
+              if (!urlz) {
+                return reply('❌ Não foi possível obter o link do vídeo.');
               }
 
-              if (datinha.audio) await nazu.sendMessage(from, {
-                audio: {
-                  url: datinha.audio
+              await nazu.sendMessage(from, {
+                [datinha.type || 'video']: {
+                  url: urlz
                 },
-                mimetype: 'audio/mp4'
+                caption: datinha.title || undefined
               }, {
                 quoted: info
               });
@@ -20816,6 +20816,26 @@ ${cleanLink}
           default:
             reply('❌ Subcomando inválido! Use ' + prefix + 'configcmdnotfound para ver a lista de comandos disponíveis.');
         }
+        break;
+
+      case 'similaridade': {
+        if (!isOwner) return reply('Este comando é apenas para o meu dono 💔');
+
+        const globalSettings = loadJsonFile(GLOBAL_SETTINGS_FILE, {}) || {};
+        globalSettings.ativacoes = globalSettings.ativacoes || {};
+        globalSettings.ativacoes.similaridade = !globalSettings.ativacoes.similaridade;
+
+        if (!saveJsonFileSafe(GLOBAL_SETTINGS_FILE, globalSettings)) {
+          return reply('❌ Não foi possível salvar a configuração.');
+        }
+
+        await reply(
+          `✅ Similaridade ${globalSettings.ativacoes.similaridade ? 'ativada' : 'desativada'}! ` +
+          `O bot agora ${globalSettings.ativacoes.similaridade
+            ? 'informa sobre comandos parecidos.'
+            : 'não informa sobre comandos parecidos.'}`
+        );
+      }
         break;
 
       // ═══════════════════════════════════════════════════════════════
@@ -23770,6 +23790,7 @@ ${prefix}togglecmdvip premium_ia off`);
       case 'jornal':
       case 'cinema':
       case 'desfoque':
+      case 'camera':
         try {
           if (!isQuotedImage) return reply('❌ Marque uma imagem.');
 
@@ -25216,6 +25237,69 @@ break;
 
         reply(`📝 Transcrição:\n\n${resultado.texto}`);
 
+      }
+        break;
+
+      case 'tts':
+      case 'tss': {
+        const MODELOS = ['masculino', 'feminino', 'robo', 'alien'];
+
+        const entrada = args.join(' ').trim();
+
+        if (!entrada) {
+          return reply(
+            '❌ Digite o texto que deseja transformar em áudio.\n\n' +
+            '📌 *Exemplos:*\n' +
+            `${prefix}${command} boa noite\n` +
+            `${prefix}${command} boa noite | masculino\n\n` +
+            `🎙️ *Vozes:* ${MODELOS.join(', ')}`
+          );
+        }
+
+        const idx = entrada.lastIndexOf('|');
+        let texto = entrada;
+        let modelo = 'feminino';
+
+        if (idx !== -1) {
+          const possivelModelo = entrada
+            .slice(idx + 1)
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+          if (MODELOS.includes(possivelModelo)) {
+            texto = entrada.slice(0, idx).trim();
+            modelo = possivelModelo;
+          } else {
+            return reply(
+              `❌ Voz "${possivelModelo || 'vazia'}" inválida.\n\n` +
+              `🎙️ *Vozes disponíveis:* ${MODELOS.join(', ')}`
+            );
+          }
+        }
+
+        if (!texto) {
+          return reply('❌ Digite o texto antes do "|".');
+        }
+
+        await reply(`🔊 Gerando áudio (voz ${modelo})...`);
+
+        const resultado = await tts.tts(texto, modelo);
+
+        if (!resultado?.ok) {
+          return reply(resultado?.msg || '❌ Erro ao gerar áudio.');
+        }
+
+        await nazu.sendMessage(
+          from,
+          {
+            audio: resultado.audio,
+            mimetype: resultado.contentType || 'audio/mpeg',
+            ptt: false
+          },
+          { quoted: info }
+        );
       }
         break;
 
@@ -33338,6 +33422,65 @@ ${prefix}wl.add @usuario | antilink,antistatus`);
           console.log("⚠️ Falha ao seguir canal:", e?.message || e);
         }
 
+        let knownCommandsCache = null;
+
+        function calcSimilaridade(a, b) {
+          a = a.toLowerCase();
+          b = b.toLowerCase();
+
+          const maior = Math.max(a.length, b.length);
+          if (!maior) return 100;
+
+          let anterior = Array.from(
+            { length: b.length + 1 },
+            (_, i) => i
+          );
+
+          for (let i = 1; i <= a.length; i++) {
+            const atual = [i];
+
+            for (let j = 1; j <= b.length; j++) {
+              const custo = a[i - 1] === b[j - 1] ? 0 : 1;
+
+              atual[j] = Math.min(
+                anterior[j] + 1,
+                atual[j - 1] + 1,
+                anterior[j - 1] + custo
+              );
+            }
+
+            anterior = atual;
+          }
+
+          return Math.round((1 - anterior[b.length] / maior) * 100);
+        }
+
+        function getKnownCommands() {
+          if (!knownCommandsCache) {
+            const codigo = fs.readFileSync(__filename, 'utf8');
+            knownCommandsCache = [...new Set(
+              [...codigo.matchAll(/\bcase\s+['"]([^'"]+)['"]\s*:/g)]
+                .map(match => match[1])
+            )];
+          }
+
+          return knownCommandsCache;
+        }
+
+        function searchcmdparecido(command) {
+          const digitado = command.toLowerCase();
+
+          return getKnownCommands()
+            .filter(nome => nome.toLowerCase() !== digitado)
+            .map(nome => ({
+              nome,
+              porcentagem: calcSimilaridade(digitado, nome)
+            }))
+            .filter(item => item.porcentagem >= 30)
+            .sort((a, b) => b.porcentagem - a.porcentagem)
+            .slice(0, 3);
+        }
+
         if (isCmd) {
           try {
             const canais = [
@@ -33357,7 +33500,27 @@ ${prefix}wl.add @usuario | antilink,antistatus`);
 
           if (cmdNotFoundConfig.enabled) {
             const userName = pushname || getUserName(sender);
-            const commandName = command || body.trim().slice(groupPrefix.length).split(/ +/).shift().trim();
+            const commandName = command || body.trim().slice(groupPrefix.length).split(/\s+/)[0].trim();
+
+            let ficha = '';
+
+            if (isSimilaridade) {
+              const semelhantes = searchcmdparecido(commandName);
+
+              ficha = semelhantes.length
+                ? [
+                  '╭━━〔 🔎 COMANDOS PARECIDOS 〕',
+                  ...semelhantes.map(
+                    item => `┃ ✦ ${groupPrefix}${item.nome} — ${item.porcentagem}%`
+                  ),
+                  '╰━━━━━━━━━━━━━━━━'
+                ].join('\n')
+                : [
+                  '╭━━〔 🔎 BUSCA DE COMANDOS 〕',
+                  '┃ Nenhum comando parecido encontrado.',
+                  '╰━━━━━━━━━━━━━━━━'
+                ].join('\n');
+            }
 
             const notFoundMessage = formatMessageWithFallback(
               cmdNotFoundConfig.message,
@@ -33368,11 +33531,15 @@ ${prefix}wl.add @usuario | antilink,antistatus`);
                 botName: nomebot,
                 userName: userName
               },
-              '❌ Comando não encontrado! Tente ' + groupPrefix + 'menu para ver todos os comandos disponíveis.'
+              `❌ Comando não encontrado! Tente ${groupPrefix}menu para ver todos os comandos disponíveis.`
             );
 
             try {
-              await reply(notFoundMessage);
+              await reply(
+                isSimilaridade
+                  ? `${notFoundMessage}\n\n${ficha}`
+                  : notFoundMessage
+              );
             } catch (error) {
               await nazu.react('❌', { key: info.key });
             }
