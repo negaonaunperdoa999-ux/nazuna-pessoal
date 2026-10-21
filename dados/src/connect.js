@@ -700,7 +700,7 @@ if (groupSettings?.x9 && inf.author && !entradaPorLink) {
                         CaptchaIndex.add(typeIds, from, answer, expiresAt, participantNumber);
 
                         await NazunaSock.sendMessage(from, {
-                            text: `?? *VERIFICAÇÃO*\n\nOlá @${participantNumber}\n\n? ${num1} + ${num2} = ?\n\n?? 5 minutos.`,
+                            text: `🔐 *VERIFICAÇÃO*\n\nOlá @${participantNumber}\n\n❓ ${num1} + ${num2} = ?\n\n⏱️ 5 minutos.`,
                             mentions: [`${participantNumber}@s.whatsapp.net`]
                         });
 
