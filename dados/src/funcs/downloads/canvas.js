@@ -1,10 +1,9 @@
 import https from 'https';
 import fs from 'fs';
-import verificarAPI from '../API.js';
+import verificarAPI, { carregarConfigLocal } from '../API.js';
+import { runBrat, toUserMessage } from '../api/index.js';
 
-const CONFIG_FILE = JSON.parse(
-    fs.readFileSync(new URL('../../config.json', import.meta.url), 'utf8')
-);
+const CONFIG_FILE = carregarConfigLocal();;
 
 const cache = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
@@ -28,40 +27,13 @@ function setCache(key, val) {
 }
 
 /**
- * Gera imagem estática Brat (Retorna a URL direta)
+ * Gera imagem estática Brat (buffer local ou URL da Vex)
  */
 async function gerarbrat(query, bg, text_color, blur) {
-    const checkAPI = await verificarAPI();
-    if (checkAPI !== true) return { ok: false, msg: checkAPI };
-
     try {
-        if (!query) return { ok: false, msg: 'O texto (query) é obrigatório' };
-
-        const cacheKey = `brat:${query.toLowerCase()}:${bg}:${text_color}:${blur}`;
-        const cached = getCached(cacheKey);
-        if (cached) return { ok: true, ...cached, cached: true };
-
-        const { apikey_vex, site_vex } = CONFIG_FILE;
-
-        // Monta a URL que retorna a imagem diretamente
-        let url = `${site_vex}/api/canvas/brat?apikey=${apikey_vex}&query=${encodeURIComponent(query)}`;
-        if (bg) url += `&bg=${encodeURIComponent(bg)}`;
-        if (text_color) url += `&text_color=${encodeURIComponent(text_color)}`;
-        if (blur) url += `&blur=${encodeURIComponent(blur)}`;
-
-        const result = {
-            criador: 'Tokyo',
-            type: 'image',
-            mime: 'image/webp',
-            query,
-            url: url // A URL é o próprio endpoint, pois ele já entrega a imagem
-        };
-
-        setCache(cacheKey, result);
-        return { ok: true, ...result };
-
+        return await runBrat({ query, bg, text_color, blur });
     } catch (err) {
-        return { ok: false, msg: err.message };
+        return { ok: false, msg: toUserMessage(err) };
     }
 }
 

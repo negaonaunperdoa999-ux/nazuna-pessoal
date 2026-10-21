@@ -2,16 +2,14 @@ import https from 'https';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import verificarAPI from '../API.js';
+import verificarAPI, { carregarConfigLocal } from '../API.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 
-const CONFIG_FILE = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../config.json'), 'utf8')
-);
+const CONFIG_FILE = carregarConfigLocal();
 
 
 const cache = new Map();

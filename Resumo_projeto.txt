@@ -819,3 +819,66 @@ Verificacoes:
 - Probe estrutural: default agora embute o bundle - HTML 10.084.121 bytes (9,6 MiB), `__L.bundleB64` preenchido, Fake XHR com rota `.jsdos` presente; `embedBundle:false` mantem variante remota de 2.697.735 bytes com `__L.bundleB64=null`; js-dos.js e css injetados; worker via Blob; checagem `typeof Dos==='undefined'` e tail `</html>` presentes em ambas.
 - Nao commitado na confirmacao do usuario; apos autorizacao, commit + push para main com entrada no Resumo.
 - Remanescente: tamanho do payload (10,1 MB) e o comportamento real no WebView dependem de teste on-device (painel #doomDbg); logs [TEMP-DIAG] de connect.js/index.js continuam nao commitados.
+
+Data: 2026-10-20
+Objetivo:
+- Auditar todos os comandos Vex, com foco no /play e aliases, e produzir plano de migracao para a API propria sem alterar arquivos de producao.
+
+Arquivos criados:
+- relatorio-vex-play.md (auditoria, inventario, riscos e fases de migracao)
+- Resumo_projeto.txt (esta entrada)
+
+Alteracoes realizadas:
+- Mapeados 20 endpoints Vex (19 funcionais + verificarkey) em 11 modulos e no validador API.js.
+- Auditados os fluxos play, ytmp3, play2, playvid, ytmp4, TikTok, Instagram, Pinterest, letras, brat/bratvid, welcome, TTS, transcricao, removebg, upscale, logos, edits, apikey e auto-download.
+- Documentadas as diferencas entre aliases (tiktokaudio nao separa audio; igstory nao separa story) e os caminhos de URL versus busca.
+- Registrados riscos de memoria por buffer integral, falta de timeout/limite de bytes, validacao de URL por includes, metadados incorretos, chamadas duplicadas, token GitHub hardcoded e logs com URL/chave.
+- Propostas fases de migracao, com YouTube/play como prioridade e Vex mantida como fallback.
+
+Bugs encontrados:
+- /play e /playvid ignoram os parametros de qualidade/bits passados pelo index.js.
+- /playvid acessa author.name, views.toLocaleString e description.slice sem protecao; o encadeamento de erro da busca pode gerar segunda falha.
+- upscale retorna download, mas index.js le result.download, resultando em undefined.
+- removebg baixa a imagem novamente e registra URL/chave no console.
+- logos e edits fazem validacoes e/ou requisicoes duplicadas.
+- Nenhuma validacao previa de duracao/tamanho nos caminhos com URL.
+
+Bugs corrigidos:
+- Nenhum codigo de producao foi alterado nesta rodada; as correcoes ficam para as fases de migracao.
+
+Verificacoes:
+- Auditoria read-only, sem chamadas reais a Vex/WhatsApp e sem instalacao de dependencias.
+- 33 testes da camada da Etapa 1 passaram com node v24.19.0.
+- Relatorio gravado em UTF-8 sem BOM; git diff --check sem erros de whitespace.
+- Nenhum commit ou push foi realizado.
+
+Data: 2026-10-20
+Objetivo:
+- Concluir a Fase 2A: comparar alternativas para YouTube no /play e recomendar arquitetura, sem implementar.
+
+Arquivos criados:
+- relatorio-fase2a-youtube.md (pesquisa, comparacao, contrato Baileys, arquitetura e plano 2B)
+- Resumo_projeto.txt (esta entrada)
+
+Alteracoes realizadas:
+- Confirmado suporte do Baileys 7.0.0-rc14 a {stream}, mas sem limite de bytes para streams fornecidos; a midia e gravada em arquivo temporario e o limite so vale para URL remota.
+- Confirmado que audio sem seconds calcula duracao e video sem jpegThumbnail tenta ffmpeg; passar metadados evita custo/erro.
+- Comparados yt-dlp, youtubei.js, youtube-dl-exec, yt-search, youtube-sr, ytsr, @distube/ytdl-core, ytdl-core, play-dl, yt-dlp-wrap e ffmpeg-static com versoes/datas/estado de manutencao.
+- Recomendacao primaria: backend proprio com yt-dlp + ffmpeg; alternativa local com yt-dlp; youtubei.js apenas como transicao sem binarios, com ressalvas de avaliador JS e ausencia de MP3/merge.
+- Descartadas bibliotecas descontinuadas/sem repositorio; yt-search mantido apenas como fallback de busca.
+- Proposto contrato MediaSource, media.js com temporario/limites, configuracao, fluxo de envio e criterios de aceite.
+
+Bugs encontrados:
+- Nenhum bug novo de producao; confirmado que o Baileys nao aplica maxContentLength a streams fornecidos.
+- Registrada divergencia de versao: package.json ^7.0.0-rc.9, lock rc13, instalado rc14.
+
+Bugs corrigidos:
+- Nenhum; fase somente de pesquisa.
+
+Verificacoes:
+- Nenhuma instalacao, chamada a Vex/WhatsApp/YouTube, alteracao de codigo de producao, commit ou push.
+- Relatorio gravado em UTF-8 sem BOM (509 linhas, 27.840 bytes).
+- git diff --check sem erros de whitespace; 33 testes da Etapa 1 permanecem como referencia.
+
+Pendencias:
+- Aprovar arquitetura (backend, yt-dlp local ou youtubei.js), formato de audio (MP3/M4A), limites e permissao de instalacao antes da Fase 2B.

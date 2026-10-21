@@ -264,21 +264,26 @@ global.CAPTCHA_LOCK = global.CAPTCHA_LOCK || new Set();
 
 try {
     const configContent = readFileSync(configPath, "utf8");
-    config = JSON.parse(configContent);
-
-
-    if (!config.prefixo || !config.nomebot || !config.numerodono) {
-        throw new Error('Configuração inválida: campos obrigatórios ausentes (prefixo, nomebot, numerodono)');
-    }
-
-
-    DEBUG_MODE = config.debug === true || process.env.NAZUNA_DEBUG === '1';
-    if (DEBUG_MODE) {
-        console.log('🐛 Modo DEBUG ativado - Logs detalhados habilitados');
-    }
+    config = JSON.parse(configContent) || {};
 } catch (err) {
-    console.error(`❌ Erro ao carregar configuração: ${err.message}`);
-    process.exit(1);
+    config = {};
+    console.log('⚠️ config.json ausente ou inválido: o bot vai iniciar sem o dono configurado.');
+    console.log('   Conecte-se e envie /lid no privado para obter o seu LID; depois preencha');
+    console.log('   "numerodono" e "lidowner" em dados/src/config.json (mesma pasta do index.js).');
+}
+
+// O dono (numerodono/lidowner) e opcional para a conexao: ele so habilita
+// recursos administrativos. Ausencia desses dados nao pode impedir o login.
+config.prefixo = config.prefixo || '!';
+config.nomebot = config.nomebot || 'Nazuna';
+
+if (!config.numerodono) {
+    console.log('⚠️ Dono ainda nao configurado: comandos administrativos ficam indisponiveis ate voce configurar o numerodono.');
+}
+
+DEBUG_MODE = config.debug === true || process.env.NAZUNA_DEBUG === '1';
+if (DEBUG_MODE) {
+    console.log('🐛 Modo DEBUG ativado - Logs detalhados habilitados');
 }
 
 const indexModule = (await import('./index.js')).default ?? (await import('./index.js'));
@@ -1238,11 +1243,16 @@ async function fetchLidsInBatches(NazunaSock, uniqueJids, batchSize = 5) {
 }
 
 async function updateOwnerLid(NazunaSock) {
+    if (!numerodono) {
+        return;
+    }
+
     const ownerJid = `${numerodono}@s.whatsapp.net`;
     try {
         const result = await fetchLidWithRetry(NazunaSock, ownerJid);
         if (result) {
             config.lidowner = result.lid;
+            await fs.mkdir(path.dirname(configPath), { recursive: true });
             await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
         }
     } catch (err) {

@@ -1,8 +1,21 @@
 import fs from "fs";
 
-const config = JSON.parse(
-  fs.readFileSync(new URL("../config.json", import.meta.url))
-);
+/**
+ * Le o config.json que fica na mesma pasta do index.js (dados/src/config.json).
+ * O bot precisa iniciar mesmo sem o arquivo (primeira conexao), entao ausencia
+ * ou JSON invalido nao pode derrubar o import: devolvemos um objeto vazio.
+ */
+export function carregarConfigLocal() {
+  try {
+    const raw = fs.readFileSync(new URL("../config.json", import.meta.url), 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+const config = carregarConfigLocal();
 
 async function verificarAPI(responseData = null) {
 

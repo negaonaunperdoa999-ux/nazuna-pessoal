@@ -1,10 +1,8 @@
 import https from 'https';
 import fs from 'fs';
-import verificarAPI from '../API.js';
+import verificarAPI, { carregarConfigLocal } from '../API.js';
 
-const CONFIG_FILE = JSON.parse(
-  fs.readFileSync(new URL('../../config.json', import.meta.url), 'utf8')
-);
+const CONFIG_FILE = carregarConfigLocal();;
 
 function request(url) {
   return new Promise((resolve, reject) => {

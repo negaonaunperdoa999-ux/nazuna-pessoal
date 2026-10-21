@@ -25,8 +25,45 @@ function readLocalAsset(relativePath) {
     .replace(/<\/script/gi, '<\\/script');
 }
 
-const GBAJS_SOURCE = GBAJS_FILES.map(readLocalAsset).join('\n');
-const BIOS_BASE64 = readFileSync(new URL('resources/bios.bin', GBAJS_ROOT)).toString('base64');
+// Os recursos do emulador sao lidos sob demanda: importar este modulo nunca
+// deve tocar o disco, senao a inicializacao do bot quebra quando o BIOS nao existe.
+let gbaJsSourceCache = null;
+let biosBase64Cache = null;
+let testRomBase64Cache = null;
+
+function getGbaJsSource() {
+  if (gbaJsSourceCache === null) {
+    try {
+      gbaJsSourceCache = GBAJS_FILES.map(readLocalAsset).join('\n');
+    } catch (error) {
+      throw new Error(
+        `Emulador GBA.js incompleto: nao foi possivel ler os scripts do vendor/gbajs/js (${error.message}).`
+      );
+    }
+  }
+  return gbaJsSourceCache;
+}
+
+function getBiosBase64() {
+  if (biosBase64Cache === null) {
+    try {
+      biosBase64Cache = readFileSync(new URL('resources/bios.bin', GBAJS_ROOT)).toString('base64');
+    } catch {
+      throw new Error(
+        'BIOS do emulador GBA ausente (vendor/gbajs/resources/bios.bin). '
+        + 'Coloque o arquivo bios.bin do GBA.js nessa pasta para usar o comando /gbatest.'
+      );
+    }
+  }
+  return biosBase64Cache;
+}
+
+function getTestRomBase64() {
+  if (testRomBase64Cache === null) {
+    testRomBase64Cache = Buffer.from(buildGbaTestRom()).toString('base64');
+  }
+  return testRomBase64Cache;
+}
 
 function writeWord(bytes, offset, value) {
   bytes[offset] = value & 0xff;
@@ -80,9 +117,11 @@ function buildGbaTestRom() {
   return rom;
 }
 
-const TEST_ROM_BASE64 = Buffer.from(buildGbaTestRom()).toString('base64');
-
 function buildGbaTestHtml() {
+  const gbaJsSource = getGbaJsSource();
+  const biosBase64 = getBiosBase64();
+  const testRomBase64 = getTestRomBase64();
+
   return `<!doctype html>
 <html>
 <head>
@@ -167,11 +206,11 @@ function buildGbaTestHtml() {
     </section>
     <p class="credit">Emulador GBA.js (BSD-2-Clause), empacotado localmente. Sem rede e sem ROM comercial.</p>
   </main>
-  <script>${GBAJS_SOURCE}</script>
+  <script>${gbaJsSource}</script>
   <script>
     (function () {
-      const BIOS_BASE64 = '${BIOS_BASE64}';
-      const ROM_BASE64 = '${TEST_ROM_BASE64}';
+      const BIOS_BASE64 = '${biosBase64}';
+      const ROM_BASE64 = '${testRomBase64}';
       const keys = { A: 0, B: 1, SELECT: 2, START: 3, RIGHT: 4, LEFT: 5, UP: 6, DOWN: 7, R: 8, L: 9 };
       const keyCodes = { A: 90, B: 88, SELECT: 220, START: 13, RIGHT: 39, LEFT: 37, UP: 38, DOWN: 40, R: 83, L: 65 };
       const codeToKey = { KeyZ: 'A', KeyX: 'B', Backslash: 'SELECT', Enter: 'START', ArrowRight: 'RIGHT', ArrowLeft: 'LEFT', ArrowUp: 'UP', ArrowDown: 'DOWN', KeyS: 'R', KeyA: 'L' };
