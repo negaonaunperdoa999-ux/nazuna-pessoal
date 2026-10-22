@@ -19,17 +19,23 @@ export const SOCIAL_PLATFORMS = Object.freeze({
     tiktok: {
         label: 'TikTok',
         hosts: ['tiktok.com'],
-        maxBytes: 64 * 1024 * 1024
+        maxBytes: 64 * 1024 * 1024,
+        // O WhatsApp no iOS nao reproduz HEVC/AV1 (tela preta e duracao 0:00).
+        // O yt-dlp nao aceita OR entre filtros, entao tentamos em ordem:
+        // o TikTok nomeia o codec "h264" e o YouTube/Instagram usam "avc1".
+        formatSelectors: ['b[vcodec^=h264]', 'b[vcodec^=avc1]', 'best']
     },
     instagram: {
         label: 'Instagram',
         hosts: ['instagram.com'],
-        maxBytes: 64 * 1024 * 1024
+        maxBytes: 64 * 1024 * 1024,
+        formatSelectors: ['b[vcodec^=avc1]', 'b[vcodec^=h264]', 'best']
     },
     facebook: {
         label: 'Facebook',
         hosts: ['facebook.com', 'fb.watch'],
-        maxBytes: 96 * 1024 * 1024
+        maxBytes: 96 * 1024 * 1024,
+        formatSelectors: ['b[vcodec^=avc1]', 'b[vcodec^=h264]', 'best']
     }
 });
 
@@ -107,9 +113,12 @@ export async function downloadSocialMedia(platform, url, options = {}) {
         return { ok: false, msg: `O link informado não é do ${config.label}.` };
     }
 
-    const binary = options.binary !== undefined
-        ? String(options.binary || '').trim()
-        : await findYtDlpBinary({ env: options.env });
+    // binary === null  -> nao detecta (ambiente sem yt-dlp, para teste/diagnostico)
+    // binary === ''    -> detecta pelo PATH/WinGet/projeto
+    // binary === '...' -> usa exatamente esse caminho
+    const binary = options.binary === null
+        ? ''
+        : (String(options.binary || '').trim() || await findYtDlpBinary({ env: options.env }));
     if (!binary) {
         return { ok: false, msg: 'O yt-dlp não está disponível neste ambiente; não é possível baixar do ' + config.label + '.' };
     }
@@ -118,23 +127,42 @@ export async function downloadSocialMedia(platform, url, options = {}) {
         ? null
         : (options.ffmpegPath || await findFfmpegBinary({ env: options.env }));
 
-    let media = null;
+    // O WhatsApp no iOS nao reproduz HEVC/AV1 (tela preta e duracao 0:00).
+    // Preferimos H.264; o yt-dlp nao aceita OR entre filtros, entao tentamos
+    // cada seletor ate um funcionar.
+    const selectors = Array.isArray(options.formatSelector)
+        ? options.formatSelector
+        : (config.formatSelectors || ['best']);
 
-    try {
-        media = await downloadMediaWithYtDlp(url, {
-            binary,
-            ffmpegPath,
-            fs: options.fs,
-            spawn: options.spawn,
-            signal: options.signal,
-            timeoutMs: options.timeoutMs,
-            maxBytes: options.maxBytes ?? config.maxBytes,
-            tempRoot: options.tempRoot,
-            extraArgs: options.extraArgs
-        });
-    } catch (error) {
-        const origem = String(error?.stack || '').split('\n').slice(1, 3).join(' | ').trim();
-        console.error(`[socialMedia] provider=${platform} etapa=download falha=${error?.message || 'erro desconhecido'} ${origem}`);
+    let media = null;
+    let lastError = null;
+    let usedSelector = null;
+
+    for (const selector of selectors) {
+        try {
+            media = await downloadMediaWithYtDlp(url, {
+                binary,
+                ffmpegPath,
+                fs: options.fs,
+                spawn: options.spawn,
+                signal: options.signal,
+                timeoutMs: options.timeoutMs,
+                maxBytes: options.maxBytes ?? config.maxBytes,
+                tempRoot: options.tempRoot,
+                extraArgs: ['-f', selector]
+            });
+            usedSelector = selector;
+            break;
+        } catch (error) {
+            lastError = error;
+            const semFormato = /not available|requested format|unable to extract/i.test(String(error?.message || ''));
+            if (!semFormato) break;
+        }
+    }
+
+    if (!media) {
+        const error = lastError || new Error('o yt-dlp não conseguiu baixar a mídia');
+        console.error(`[socialMedia] provider=${platform} etapa=download falha=${error.message}`);
         return { ok: false, msg: mapError(error, platform), etapa: 'download' };
     }
 
@@ -160,6 +188,7 @@ export async function downloadSocialMedia(platform, url, options = {}) {
             resolution: media.height ? `${media.height}p` : 'HD',
             sizeBytes: media.sizeBytes,
             container: media.container,
+            formatSelector: usedSelector,
             cleanup: media.cleanup
         };
     } catch (error) {

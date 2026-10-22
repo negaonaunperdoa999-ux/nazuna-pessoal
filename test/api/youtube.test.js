@@ -112,6 +112,60 @@ test('provedor padrão é local e não chama Vex', async () => {
     assert.equal(vexCalls, 0);
 });
 
+test('o fallback da VexAPI fica explícito quando a API externa responde limite de uso', async () => {
+    const providers = providerSet({
+        local: {
+            search: async () => { throw new ApiError(ErrorCodes.NETWORK); }
+        },
+        vex: {
+            search: async () => {
+                throw new ApiError(ErrorCodes.RATE_LIMITED, {
+                    userMessage: 'Limite diário da API atingido. Tente novamente mais tarde.'
+                });
+            }
+        }
+    });
+    const { cache, limiter } = isolated();
+
+    await assert.rejects(
+        runYoutubeSearch(
+            { query: 'teste' },
+            {
+                provider: 'auto',
+                config: { api: { youtube: { allowVexFallback: true } } },
+                providers,
+                cache,
+                limiter,
+                env: {}
+            }
+        ),
+        (error) => /\[fallback VexAPI\]/.test(error.userMessage)
+            && /Limite diário da API atingido/.test(error.userMessage)
+    );
+});
+
+test('sem fallback configurado, o provider local é o único caminho', async () => {
+    let vexCalls = 0;
+    const providers = providerSet({
+        local: {
+            search: async () => { throw new ApiError(ErrorCodes.NETWORK); }
+        },
+        vex: {
+            search: async () => { vexCalls++; return video(); }
+        }
+    });
+    const { cache, limiter } = isolated();
+
+    await assert.rejects(
+        runYoutubeSearch(
+            { query: 'teste' },
+            { provider: 'auto', config: {}, providers, cache, limiter, env: {} }
+        ),
+        (error) => error.code === ErrorCodes.NETWORK
+    );
+    assert.equal(vexCalls, 0);
+});
+
 test('vex explícito continua funcionando com fallback desativado', async () => {
     let localCalls = 0;
     let vexCalls = 0;

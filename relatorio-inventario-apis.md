@@ -9,6 +9,25 @@
 
 ---
 
+## 0. Correções aplicadas (rodadas de validação com rede real)
+
+| Sintoma | Causa comprovada | Correção |
+|---|---|---|
+| `"Limite de uso da API atingido"` na busca/vídeo do YouTube | A mensagem só existe no provider **VexAPI** (`providers/vex/youtube.js`). O provider local falhava antes porque o processo do bot não encontrava o `yt-dlp` (o PATH do processo filho não tinha as pastas do WinGet) e, sem o provider local, sobrava a API externa, que tem cota | `ytDlpRunner.findBinary` agora procura em várias raízes (`LOCALAPPDATA`, `USERPROFILE`, `HOME`, `os.homedir()`, `bin/` do projeto, `node_modules/.bin`) e o launcher injeta as pastas do `yt-dlp`/FFmpeg no `PATH` do processo filho |
+| Fallback da VexAPI silencioso (usuário não sabia que a cota externa foi usada) | O fallback não era sinalizado na resposta | `features/youtube.js` marca a mensagem com `[fallback VexAPI]` e registra `[youtube:busca]`/`[youtube:midia] provider=… falhou …; usando …`; o launcher mostra `🎬 YouTube: provider=… fallbackVex=…` e avisa `Fallback da VexAPI ATIVO` |
+| Vídeo do TikTok chegando com tela preta / duração `0:00` no iPhone (Web e Android reproduzem) | O TikTok serve **HEVC (h265)**; o WhatsApp no iOS não reproduz HEVC. Não era AV1 nem problema do WhatsApp | `socialMedia.js` passa a preferir H.264 em cadeia de seletores: `b[vcodec^=h264]` → `b[vcodec^=avc1]` → `best` (o `yt-dlp` não aceita OR entre filtros e o TikTok nomeia o codec `h264`, YouTube/Instagram usam `avc1`) |
+| `yt-dlp` "não encontrado" em alguns ambientes | A busca dependia só de `LOCALAPPDATA` | Detecção multi-raiz (ver acima) + teste de regressão |
+| `TypeError: Cannot read properties of undefined (reading 'toString')` ao enviar o vídeo do `!tiktok` **ou do `!instagram`** | Os dois comandos montavam a mídia como `{ buffer }`, mas o Baileys (`getStream`) só aceita **Buffer cru**, `{ stream }` ou `{ url }` — com `{ buffer }` ele caía em `item.url.toString()` e estourava | `dados/src/funcs/downloads/socialMediaMessage.js` (`buildSocialMediaPayload`) traduz o retorno do adaptador para o formato aceito pelo Baileys, validando buffer/tamanho antes do envio; `!tiktok` e `!instagram` enviam o Buffer cru e mantêm `{ url }` para o resultado da busca |
+| `!facebook` perdia o nome do arquivo e fixava o tipo como vídeo | O comando lia `result.filename`, mas o adaptador devolve `fileName` (o nome chegava vazio e o Baileys usava `file`); o tipo era fixado em `video`, então uma foto do Facebook seria enviada como vídeo | O `!facebook` passa a usar `buildSocialMediaPayload` (tipo real, MIME e nome corretos), mantendo miniatura, legenda e o fallback para documento |
+| `TypeError: Cannot read properties of undefined (reading 'length')` em `index.js` ao processar qualquer mensagem (inclusive `!menu`) | `dados/src/config.json` estava vazio (`{}`), então `config.prefixo` era `undefined` → `groupPrefix` (`groupData.customPrefix \|\| prefixo`) ficava `undefined` → `groupPrefix.length` estourava em `index.js:2203`. A origem do `{}` foi o runner de testes, que criava um config vazio temporário | `dados/src/utils/defaultConfig.js` (defaults + `normalizeConfig`) é usado pelo launcher (que agora **completa** configs incompletos sem apagar o que o usuário configurou) e pelo `index.js` (normalização em memória); `dados/src/utils/messageFilters.js` resolve o prefixo (`resolveCommandPrefix`, nunca `undefined`) e filtra mensagens de sistema (`shouldIgnoreSystemMessage`, mantendo revogação/anti-delete, revisões e stubs); o runner de testes agora salva/restaura o config original e usa uma config completa |
+| QR Code falha com `Cannot read properties of undefined (reading 'split')` | O launcher injetava as pastas do `yt-dlp`/FFmpeg no PATH do processo filho lendo `env.PATH` de uma cópia `{ ...process.env }`. No Windows a variável real é `Path` (minúsculo) e a cópia não normaliza a caixa: `env.PATH` ficava `undefined` e o `.split()` estourava | `findEnvKey(env, 'PATH')` localiza a chave real (qualquer caixa) e a reescreve na mesma chave; sem PATH no ambiente o launcher avisa com mensagem clara e sobe o bot sem as ferramentas |
+
+**Validação em rede real:** TikTok `https://vt.tiktok.com/ZSgySj4EL/` → `h264/yuv420p` + `aac`
+(1.151.644 B; antes, com HEVC, eram 2.193.071 B); Facebook (vídeo público) → `h264/High/yuv420p`
+1280×720 + `aac/LC`; YouTube → `avc1` + `aac`; SoundCloud (`nativo-v2`) → `.m4a` AAC/LC.
+
+---
+
 ## 1. Estado da API própria (`dados/src/funcs/api/`)
 
 | Arquivo | Papel |

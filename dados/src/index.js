@@ -3,6 +3,7 @@ import path from 'path';
 import sharp from 'sharp'
 import { autoDownloadYoutube, isYoutubeUrl, runYoutubeCommand } from './funcs/downloads/youtubeCommands.js';
 import { downloadSocialMedia } from './funcs/api/providers/local/socialMedia.js';
+import { buildSocialMediaPayload } from './funcs/downloads/socialMediaMessage.js';
 import { searchTikTok } from './funcs/api/providers/local/tiktokSearch.js';
 function patchBaileysNewsletterFollow() {
   try {
@@ -197,6 +198,8 @@ import {
   idsMatch,
   idInArray
 } from './utils/helpers.js';
+import { normalizeConfig } from './utils/defaultConfig.js';
+import { resolveCommandPrefix, shouldIgnoreSystemMessage } from './utils/messageFilters.js';
 import {
   loadMsgPrefix,
   saveMsgPrefix,
@@ -985,6 +988,9 @@ try {
 }
 const botVersion = packageJson.version;
 
+// Aviso do config.json incompleto: mostra uma vez por processo, nao a cada mensagem.
+let configIncompletoAvisado = false;
+
 // Inicializa o cache JID→LID
 initJidLidCache(JID_LID_CACHE_FILE);
 
@@ -997,9 +1003,23 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
   // Log de início de processamento para debug paralelo
   const msgId = info?.key?.id?.slice(-6) || 'unknown';
   const from = info?.key?.remoteJid || 'unknown';
-  try { console.log(`[TEMP-DIAG C6] NazuninhaBotExec ENTRY id=${msgId} jid=${from} hasMsg=${!!info?.message} fromMe=${!!info?.key?.fromMe}`); } catch (e) {}
 
   let config = loadJsonFile(CONFIG_FILE, {});
+  // O config.json e criado na instalacao e e ignorado pelo Git. Se ele estiver
+  // incompleto (ex.: um "{}" deixado por uma execucao de teste interrompida),
+  // o bot sobe sem prefixo e toda mensagem quebra ao calcular o comando.
+  // Aqui as chaves obrigatorias sao completadas em memoria.
+  const configNormalizado = normalizeConfig(config);
+  config = configNormalizado.config;
+  if ((configNormalizado.fixed.length || configNormalizado.invalid.length) && !configIncompletoAvisado) {
+    configIncompletoAvisado = true;
+    const detalhes = [
+      configNormalizado.fixed.length ? `ausentes: ${configNormalizado.fixed.join(', ')}` : '',
+      configNormalizado.invalid.length ? `inválidas: ${configNormalizado.invalid.join(', ')}` : ''
+    ].filter(Boolean).join(' | ');
+    console.warn(`⚠️ config.json incompleto (${detalhes}). Usando os valores padrão para essas chaves.`);
+    console.warn('💡 Rode "npm start" para que o config.json seja corrigido no disco.');
+  }
   ensureDatabaseIntegrity({ log: Boolean(config?.debug) });
 
   // Verificação e correção do prefixo reservado $ ao inicializar
@@ -1621,7 +1641,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     var r;
     const from = info.key.remoteJid;
     const isGroup = from?.endsWith('@g.us') || false;
-    try { console.log(`[TEMP-DIAG C6b] key participant=${info.key.participant} jid=${info.key.remoteJid} fromMe=${info.key.fromMe}`); } catch (e) {}
     if (!info.key.participant && !info.key.remoteJid) return;
     let sender;
     if (isGroup) {
@@ -1659,7 +1678,14 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
     // Se sender ainda for undefined, ignora a mensagem (ex: mensagens de sistema, stubs, etc)
     if (!sender) {
       debugLog('Sender não identificado, ignorando mensagem');
-      console.log(`[TEMP-DIAG C7] DESCARTADO: sender nao identificado id=${msgId}`);
+      return;
+    }
+
+    // Mensagens de sistema do WhatsApp (protocolMessage sem revogação) não têm
+    // conteúdo do usuário e não geram comando: são ignoradas aqui.
+    // Continuam sendo processados: revogação (anti-delete), revisões e stubs.
+    if (shouldIgnoreSystemMessage(info.message)) {
+      debugLog('Mensagem de sistema ignorada (protocolMessage sem conteúdo)');
       return;
     }
 
@@ -1908,7 +1934,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       return message.conversation || message.extendedTextMessage?.text || message.imageMessage?.caption || message.videoMessage?.caption || message.documentWithCaptionMessage?.message?.documentMessage?.caption || message.viewOnceMessage?.message?.imageMessage?.caption || message.viewOnceMessage?.message?.videoMessage?.caption || message.viewOnceMessageV2?.message?.imageMessage?.caption || message.viewOnceMessageV2?.message?.videoMessage?.caption || message.editedMessage?.message?.protocolMessage?.editedMessage?.extendedTextMessage?.text || message.editedMessage?.message?.protocolMessage?.editedMessage?.imageMessage?.caption || '';
     };
     const body = getMessageText(info.message) || info?.text || '';
-    try { console.log(`[TEMP-DIAG C8] body extraida id=${msgId} len=${body.length} tipom=${Object.keys(info?.message || {}).join(',')} body="${body.trim().slice(0, 40)}"`); } catch (e) {}
     // ==================== INICIAR ====================
     startAutoAcceptSystem(nazu, from);
 
@@ -2196,7 +2221,10 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       }
       return removed;
     };
-    const groupPrefix = groupData.customPrefix || prefixo;
+    // Prefixo do comando: customizado do grupo > prefixo global > prefixo padrão.
+    // resolveCommandPrefix nunca devolve undefined (o bot continua funcionando
+    // mesmo com o config.json incompleto).
+    const groupPrefix = resolveCommandPrefix(groupData, prefixo);
     var isCmd = body.trim().startsWith(groupPrefix);
 
     // Suporte para "! comando" (com espaço após o prefixo)
@@ -2223,10 +2251,8 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       args.push(...newArgs);
       q = newArgs.join(' ');
     }
-    try { console.log(`[TEMP-DIAG C9] comando=${command} isCmd=${isCmd} prefix="${groupPrefix}" body="${body.trim().slice(0, 30)}"`); } catch (e) {}
 
     const isPremium = premiumListaZinha[sender] || premiumListaZinha[from] || isOwner;
-    try { console.log(`[TEMP-DIAG C11] pre-gates: isGroup=${isGroup} isOwner=${isOwner} isPremium=${isPremium} isOwnerOrSub=${isOwnerOrSub} isCmd=${isCmd} matAlias=${matchedAlias} from=${from?.slice(0, 15)}`); } catch (e) {}
 
     // Verificação de captcha para solicitações de entrada em grupos (DEVE vir ANTES de antipv)
     // Otimizado: usa índice de captcha em vez de varrer todos os arquivos
@@ -2321,7 +2347,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
 
 
 
-    try { console.log(`[TEMP-DIAG C12] apos captcha | command=${command}`); } catch (e) {}
     if (!isGroup) {
       // Exceção para comandos de transmissão que devem funcionar no PV
       const tm2Commands = ['inscrevertm', 'inscrevertm2', 'desinscrever', 'desinscrevertm', 'cancelartm'];
@@ -2346,7 +2371,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
         return;
       };
     };
-    try { console.log(`[TEMP-DIAG C13] apos antipv | command=${command}`); } catch (e) {}
     if (isGroup && banGpIds[from] && !isOwner && !isPremium) {
       return;
     };
@@ -2640,7 +2664,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       return;
     };
 
-    try { console.log(`[TEMP-DIAG C14] apos gates grupo adm/bloqueados | command=${command}`); } catch (e) {}
     if (isCmd && antiSpamGlobal?.enabled && !isOwnerOrSub) {
       try {
         const cfg = antiSpamGlobal;
@@ -2674,7 +2697,6 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
         console.error('Erro no AntiSpam Global:', e);
       }
     }
-    try { console.log(`[TEMP-DIAG C14b] apos antispam | command=${command}`); } catch (e) {}
     if (isGroup && groupData.afkUsers && groupData.afkUsers[sender]) {
       try {
         const afkReason = groupData.afkUsers[sender].reason;
@@ -4762,10 +4784,8 @@ function getMediaInfo(message) {
 
     const botStateFile = pathz.join(DATABASE_DIR, 'botState.json');
     if (botState.status === 'off' && !isOwner) {
-      console.log(`[TEMP-DIAG C9b] DESCARTADO: botState off (nao dono) cmd=${command}`);
       return;
     }
-    try { console.log(`[TEMP-DIAG C15] botState ok | command=${command}`); } catch (e) {}
     if (botState.viewMessages) nazu.readMessages([info.key]);
     try {
       if (budy2 && budy2.length > 1) {
@@ -4999,7 +5019,6 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
     if (isCmd && globalBlocks.commands && globalBlocks.commands[command]) {
       return reply(`🚫 O comando *${command}* está temporariamente desativado globalmente.\nMotivo: ${globalBlocks.commands[command].reason}`);
     }
-    try { console.log(`[TEMP-DIAG C16] apos blacklists/globalBlocks | cmdBloqGlobal=${(globalBlocks.commands && globalBlocks.commands[command]) ? 'BLOQUEADO-SIM' : 'ok'}`); } catch (e) {}
     if (isCmd && commandStats && commandStats.trackCommandUsage && command && command.length > 0) {
       commandStats.trackCommandUsage(command, sender);
     }
@@ -5533,14 +5552,12 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
       // Otimização: Normalização otimizada
       const normalizedTrigger = optimizer.normalizeCommand(command) || normalizar(command);
       // Otimização: Cache de comandos personalizados
-      try { console.log(`[TEMP-DIAG C17] antes customCmd | trigger=${normalizedTrigger}`); } catch (e) {}
       const customCmd = await optimizer.memoize(
         `customcmd:${from}:${normalizedTrigger}`,
         () => Promise.resolve(findCustomCommand(normalizedTrigger)),
         5000 // 5 segundos
       );
       if (customCmd) {
-        try { console.log(`[TEMP-DIAG C17b] CUSTOM COMMAND ENCONTRADA trigger=${normalizedTrigger}`); } catch (e) {}
         try {
           const responseData = customCmd.response;
           const settings = customCmd.settings || {};
@@ -5865,7 +5882,6 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
       }
     }
 
-    try { console.log(`[TEMP-DIAG C18] apos customCmds | command=${command}`); } catch (e) {}
     if (isCmd && !['cmdlimitar', 'cmdlimit', 'limitarcmd', 'cmddeslimitar', 'cmdremovelimit', 'rmcmdlimit', 'cmdlimites', 'cmdlimits', 'listcmdlimites'].includes(command)) {
       const globalLimitCheck = checkCommandLimit(command, sender);
       if (globalLimitCheck.limited) {
@@ -5874,7 +5890,6 @@ if (antitoxic && antitoxic.isEnabled && antitoxic.isEnabled(from) && body && ia)
     }
 
     // Verificação de comandos VIP
-    try { console.log(`[TEMP-DIAG C19] checagem VIP | command=${command} isVip=${vipCommandsManager.isVipCommand(command)}`); } catch (e) {}
     if (isCmd && vipCommandsManager.isVipCommand(command)) {
       if (!isPremium) {
         await reply(`🔒 *Comando VIP Exclusivo*
@@ -5897,7 +5912,6 @@ Entre em contato com o dono do bot:
     }
 
 
-    try { console.log(`[TEMP-DIAG C20] checagem subowner | command=${command}`); } catch (e) {}
     // ==================== VERIFICAÇÃO DE COMANDOS PARA SUBDONOS ====================
     if (isCmd && command && !isOwner) {
       try {
@@ -5915,7 +5929,6 @@ Entre em contato com o dono do bot:
         console.error('Erro ao verificar lista de comandos de subdonos:', e);
       }
     }
-    try { console.log(`[TEMP-DIAG C10] DISPATCHER cmd=${command} jid=${from?.slice(0, 16)}`); } catch (e) {}
 
 
     switch (command) {
@@ -19337,18 +19350,23 @@ ${prefix}addsubbot @152656307871952`
             .then(async (datinha) => {
               if (!datinha.ok) return reply(datinha.msg);
 
-              const urlz = datinha.urls?.[0];
-              const midia = datinha.buffer
-                ? { buffer: datinha.buffer }
-                : (urlz ? { url: urlz } : null);
+              // O adaptador entrega a midia como Buffer (ou a busca entrega uma
+              // URL). O Baileys so aceita Buffer cru, { stream } ou { url }:
+              // enviar { buffer } quebrava em getStream (item.url undefined).
+              const midia = buildSocialMediaPayload(datinha);
 
-              if (!midia) {
-                return reply('❌ Não foi possível obter a mídia do vídeo.');
+              if (!midia.ok) {
+                console.error(`[tiktok] midia indisponivel (etapa=${midia.etapa}): ${midia.msg}`);
+                return reply(`❌ ${midia.msg}`);
               }
 
+              console.log(`[tiktok] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}`);
+
               await nazu.sendMessage(from, {
-                [datinha.type || 'video']: midia,
-                caption: datinha.title || undefined
+                [midia.type]: midia.media,
+                ...(midia.mimetype ? { mimetype: midia.mimetype } : {}),
+                ...(midia.fileName ? { fileName: midia.fileName } : {}),
+                caption: midia.caption
               }, {
                 quoted: info
               });
@@ -19393,6 +19411,19 @@ ${prefix}addsubbot @152656307871952`
                 return reply(`❌ Erro: ${result.msg}`);
               }
 
+              // O adaptador entrega a mídia como Buffer (aceito pelo Baileys).
+              // Aqui o tipo, o MIME type e o nome do arquivo sao conferidos
+              // antes do envio: o comando lia "filename", que o adaptador nunca
+              // devolve (a chave real é "fileName"), e fixava o tipo como video.
+              const midia = buildSocialMediaPayload(result);
+
+              if (!midia.ok) {
+                console.error(`[facebook] midia indisponivel (etapa=${midia.etapa}): ${midia.msg}`);
+                return reply(`❌ ${midia.msg}`);
+              }
+
+              console.log(`[facebook] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}`);
+
               const qualities = Array.isArray(result.allQualities) ? result.allQualities : [];
               const qualityList = qualities.map((item, i) =>
                 `${i + 1}. ${item.resolution}`
@@ -19416,17 +19447,17 @@ ${prefix}addsubbot @152656307871952`
 
               try {
                 await nazu.sendMessage(from, {
-                  video: result.buffer,
-                  mimetype: result.mimetype || 'video/mp4',
-                  fileName: result.filename
+                  [midia.type]: midia.media,
+                  mimetype: midia.mimetype || (midia.type === 'image' ? 'image/jpeg' : 'video/mp4'),
+                  fileName: midia.fileName
                 }, { quoted: info });
               } catch (videoError) {
                 if (String(videoError).includes("ENOSPC") || String(videoError).includes("size")) {
                   await reply('📦 Vídeo muito grande, enviando como documento...');
                   await nazu.sendMessage(from, {
-                    document: result.buffer,
-                    fileName: result.filename,
-                    mimetype: 'video/mp4'
+                    document: midia.media,
+                    fileName: midia.fileName,
+                    mimetype: midia.mimetype || 'video/mp4'
                   }, { quoted: info });
                 } else {
                   console.error('Erro ao enviar vídeo do Facebook:', videoError);
@@ -19464,10 +19495,23 @@ ${prefix}addsubbot @152656307871952`
 
               for (const item of itens) {
 
+                // Mesmo contrato do TikTok: o adaptador entrega a mídia como
+                // Buffer (ou uma URL) e o Baileys só aceita Buffer cru,
+                // { stream } ou { url } — { buffer } quebrava em getStream.
+                const midia = buildSocialMediaPayload(item);
+
+                if (!midia.ok) {
+                  console.error(`[instagram] midia indisponivel (etapa=${midia.etapa}): ${midia.msg}`);
+                  return reply(`❌ ${midia.msg}`);
+                }
+
+                console.log(`[instagram] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}`);
+
                 await nazu.sendMessage(from, {
-                  [item.type || 'video']: item.buffer
-                    ? { buffer: item.buffer }
-                    : { url: item.url }
+                  [midia.type]: midia.media,
+                  ...(midia.mimetype ? { mimetype: midia.mimetype } : {}),
+                  ...(midia.fileName ? { fileName: midia.fileName } : {}),
+                  ...(midia.caption ? { caption: midia.caption } : {})
                 }, {
                   quoted: info
                 });

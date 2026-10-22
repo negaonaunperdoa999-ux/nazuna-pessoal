@@ -79,7 +79,7 @@ test('recusa URL inválida ou de outra plataforma com mensagem clara', async () 
 
 test('informa que o yt-dlp está ausente, sem quebrar o bot', async () => {
     const resultado = await downloadInstagram('https://www.instagram.com/reel/ABC/', {
-        binary: '',
+        binary: null,
         tempRoot: await tempRoot()
     });
 
@@ -187,10 +187,48 @@ test('downloads simultâneos usam diretórios exclusivos', async () => {
     await fsp.rm(root, { recursive: true, force: true });
 });
 
+test('tenta H.264 primeiro e cai para o próximo seletor quando o formato não existe', async () => {
+    const root = await tempRoot();
+    const seletoresUsados = [];
+
+    const spawn = fakeSpawn({
+        async onSpawn({ args, emitStdout, child }) {
+            const selector = args[args.indexOf('-f') + 1];
+            seletoresUsados.push(selector);
+
+            if (selector.includes('h264')) {
+                child.stderr.emit('data', Buffer.from('ERROR: Requested format is not available'));
+                child.emit('close', 1);
+                return;
+            }
+
+            const template = args[args.indexOf('-o') + 1];
+            const target = template.replace('%(ext)s', 'mp4');
+            await fsp.writeFile(target, mp4Bytes());
+            emitStdout(`${target}\n`);
+        }
+    });
+
+    const resultado = await downloadSocialMedia('tiktok', 'https://www.tiktok.com/@u/video/1', {
+        binary: 'yt-dlp',
+        spawn,
+        tempRoot: root
+    });
+
+    assert.equal(resultado.ok, true);
+    assert.equal(seletoresUsados[0], 'b[vcodec^=h264]');
+    assert.equal(seletoresUsados[1], 'b[vcodec^=avc1]');
+    assert.equal(resultado.formatSelector, 'b[vcodec^=avc1]');
+
+    await fsp.rm(root, { recursive: true, force: true });
+});
+
 test('cada plataforma tem limite de tamanho definido', () => {
     for (const config of Object.values(SOCIAL_PLATFORMS)) {
         assert.ok(config.maxBytes > 0, 'precisa de limite');
         assert.ok(Array.isArray(config.hosts) && config.hosts.length > 0);
+        assert.ok(Array.isArray(config.formatSelectors) && config.formatSelectors.length > 0);
+        assert.match(config.formatSelectors[0], /vcodec\^=(h264|avc1)/, 'deve preferir H.264');
     }
 });
 

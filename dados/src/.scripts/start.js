@@ -6,6 +6,7 @@ import path from 'path';
 import { spawn, execSync } from 'child_process';
 import readline from 'readline/promises';
 import os from 'os';
+import { normalizeConfig } from '../utils/defaultConfig.js';
 
 const CONFIG_PATH = path.join(process.cwd(), 'dados', 'src', 'config.json');
 const NODE_MODULES_PATH = path.join(process.cwd(), 'node_modules');
@@ -144,36 +145,54 @@ async function displayHeader() {
   console.log();
 }
 
-const DEFAULT_CONFIG = {
-  nomedono: '',
-  numerodono: '',
-  nomebot: 'Nazuna',
-  prefixo: '!',
-  site_vex: 'https://vexapi.com.br',
-  apikey_vex: '',
-  github_ofc: 'https://github.com/DevTokyoVx/nazuna',
-  autor: 'DevTokyoVx',
-  repositorio: 'nazuna',
-  modoaluguel: false,
-  WA_WEB_VERSION: {
-    aviso: 'Não mexa aqui, pode afetar o funcionamento do BOT.',
-    value: [2, 3000, 1034740716]
-  }
-};
-
+/**
+ * Garante que o config.json exista e esteja completo.
+ *
+ * O arquivo e ignorado pelo Git: quando ele falta, e criado com os valores
+ * padrao; quando existe mas esta incompleto (ex.: um "{}" deixado por uma
+ * execucao de teste interrompida), as chaves ausentes/invalidas sao
+ * completadas SEM apagar o que o usuario ja configurou.
+ */
 async function ensureConfigFile() {
-  if (fsSync.existsSync(CONFIG_PATH)) {
+  let current = null;
+  let existe = fsSync.existsSync(CONFIG_PATH);
+
+  if (existe) {
+    try {
+      current = JSON.parse(await fs.readFile(CONFIG_PATH, 'utf8'));
+    } catch (error) {
+      aviso(`⚠️ config.json inválido (${error.message}); será recriado com os valores padrão.`);
+      current = null;
+      existe = false;
+    }
+  }
+
+  const { config, fixed, invalid } = normalizeConfig(current);
+
+  if (!existe) {
+    try {
+      fsSync.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+      fsSync.writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+      aviso('ℹ️ config.json criado com valores padrão (dados/src/config.json).');
+      mensagem('📝 Conecte-se normalmente; depois configure o dono (veja /lid e o comando /numerodono).');
+    } catch (error) {
+      aviso(`❌ Falha ao criar o config.json padrão: ${error.message}`);
+      mensagem('📝 O bot pode iniciar assim mesmo, mas confira as permissões de arquivo da pasta.');
+    }
     return;
   }
 
+  if (fixed.length === 0 && invalid.length === 0) return;
+
   try {
-    fsSync.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-    fsSync.writeFileSync(CONFIG_PATH, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, 'utf8');
-    aviso('ℹ️ config.json criado com valores padrão (dados/src/config.json).');
-    mensagem('📝 Conecte-se normalmente; depois configure o dono (veja /lid e o comando /numerodono).');
+    fsSync.writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+    const partes = [];
+    if (fixed.length) partes.push(`ausentes: ${fixed.join(', ')}`);
+    if (invalid.length) partes.push(`inválidas: ${invalid.join(', ')}`);
+    aviso(`⚠️ config.json incompleto (${partes.join(' | ')}). As chaves faltantes foram preenchidas com os valores padrão.`);
+    mensagem('📝 Suas configurações anteriores foram preservadas.');
   } catch (error) {
-    aviso(`❌ Falha ao criar o config.json padrão: ${error.message}`);
-    mensagem('📝 O bot pode iniciar assim mesmo, mas confira as permissões de arquivo da pasta.');
+    aviso(`❌ Falha ao completar o config.json: ${error.message}`);
   }
 }
 
@@ -247,6 +266,86 @@ function detectFfmpegDir() {
   return null;
 }
 
+function detectYtDlpDir() {
+  const candidates = [];
+
+  if (process.env.NAZUNA_YOUTUBE_YTDLP_PATH) {
+    candidates.push(path.dirname(process.env.NAZUNA_YOUTUBE_YTDLP_PATH));
+  }
+
+  const envPath = process.env.PATH || '';
+  for (const dir of envPath.split(path.delimiter).filter(Boolean)) {
+    candidates.push(dir);
+  }
+
+  const homes = [process.env.LOCALAPPDATA, process.env.USERPROFILE, process.env.HOME].filter(Boolean);
+  for (const home of homes) {
+    candidates.push(path.join(home, 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages', 'yt-dlp.yt-dlp_Microsoft.Winget.Source_8wekyb3d8bbwe'));
+  }
+
+  if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
+    const packages = path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages');
+    try {
+      for (const entry of fsSync.readdirSync(packages)) {
+        if (!entry.startsWith('yt-dlp.yt-dlp')) continue;
+        candidates.push(path.join(packages, entry));
+      }
+    } catch { /* sem pacotes do WinGet */ }
+  }
+
+  const names = process.platform === 'win32' ? ['yt-dlp.exe'] : ['yt-dlp'];
+  for (const dir of candidates) {
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      try {
+        if (fsSync.existsSync(candidate)) return dir;
+      } catch { /* ignora */ }
+    }
+  }
+
+  return null;
+}
+
+async function logYoutubeProviderState() {
+  try {
+    const raw = await fs.readFile(CONFIG_PATH, 'utf8');
+    const config = JSON.parse(raw);
+    const youtube = config?.api?.youtube || {};
+    const provider = process.env.NAZUNA_YOUTUBE_PROVIDER
+      || youtube.provider
+      || config?.api?.youtubeProvider
+      || config?.youtubeProvider
+      || 'local';
+    const allowFallback = process.env.NAZUNA_YOUTUBE_ALLOW_VEX_FALLBACK
+      ?? youtube.allowVexFallback
+      ?? youtube.allow_vex_fallback
+      ?? false;
+    const fallbackAtivo = provider === 'auto' && (allowFallback === true || allowFallback === 'true' || allowFallback === '1');
+
+    info(`🎬 YouTube: provider=${provider} fallbackVex=${fallbackAtivo ? 'ATIVO' : 'desativado'}`);
+    if (fallbackAtivo) {
+      aviso('⚠️ Fallback da VexAPI ATIVO: se o provider local falhar, a VexAPI sera usada e pode responder "Limite de uso da API atingido".');
+    }
+  } catch {
+    info('🎬 YouTube: usando a configuracao padrao (provider=local, sem fallback da VexAPI)');
+  }
+}
+
+/**
+ * Procura a chave de uma variável dentro de uma copia de process.env.
+ * No Windows a variável costuma vir como "Path" e o Node só faz a leitura
+ * sem distinção de maiúsculas/minúsculas (process.env.PATH). Uma copia
+ * feita com {...process.env}, porém, mantem a caixa original: por isso
+ * "env.PATH" pode ser undefined mesmo com "Path" definido.
+ */
+function findEnvKey(env, name) {
+  const target = name.toUpperCase();
+  for (const key of Object.keys(env)) {
+    if (key.toUpperCase() === target) return key;
+  }
+  return null;
+}
+
 function startBot(codeMode = false) {
   const args = ['--expose-gc', MAIN_FILE];
   if (codeMode) args.push('--code');
@@ -254,18 +353,47 @@ function startBot(codeMode = false) {
   info(`📷 Iniciando com ${codeMode ? 'código de pareamento' : 'QR Code'}`);
   info(`📄 Arquivo principal: ${MAIN_FILE}`);
 
-  // O Baileys gera a miniatura de video chamando "ffmpeg" do PATH.
-  // Sem o FFmpeg no PATH do processo, o video vai sem miniatura.
-  // O caminho do Node continua no PATH (usamos process.execPath para o spawn).
+  // O Baileys gera a miniatura de video chamando "ffmpeg" do PATH e o
+  // provider local procura o yt-dlp: sem isso no PATH do processo filho, o
+  // provider local falha e sobra a API externa (que tem cota).
   const env = { ...process.env, FORCE_COLOR: '1' };
+  const toolDirs = [];
+
   const ffmpegDir = detectFfmpegDir();
+  const ytDlpDir = detectYtDlpDir();
+
+  if (ffmpegDir) toolDirs.push(ffmpegDir);
+  if (ytDlpDir) toolDirs.push(ytDlpDir);
+
+  // O PATH precisa ser lido pela chave real ("Path" no Windows) e reescrito
+  // na mesma chave, senao o processo filho perde as pastas de Ferramentas.
+  const pathKey = findEnvKey(env, 'PATH');
+  if (!pathKey) {
+    aviso('⚠️ PATH não encontrado no ambiente: o bot vai iniciar sem as pastas do yt-dlp/FFmpeg no PATH.');
+    mensagem('📝 Defina o PATH do sistema ou use NAZUNA_YOUTUBE_YTDLP_PATH / NAZUNA_YOUTUBE_FFMPEG_PATH.');
+  } else {
+    for (const dir of toolDirs) {
+      const current = typeof env[pathKey] === 'string' ? env[pathKey] : '';
+      const dirs = current.split(path.delimiter).filter(Boolean);
+      if (!dirs.includes(dir)) {
+        env[pathKey] = `${dir}${path.delimiter}${current}`;
+      }
+    }
+  }
 
   if (ffmpegDir) {
-    env.PATH = `${ffmpegDir}${path.delimiter}${env.PATH || ''}`;
     info(`🎞️ FFmpeg disponível para miniaturas: ${ffmpegDir}`);
   } else {
     aviso('⚠️ FFmpeg não encontrado: vídeos serão enviados sem miniatura (o iOS pode exibir capa preta).');
   }
+
+  if (ytDlpDir) {
+    info(`⬇️ yt-dlp disponível no PATH do bot: ${ytDlpDir}`);
+  } else {
+    aviso('⚠️ yt-dlp não encontrado: o provider local de mídia (TikTok/Instagram/Facebook) ficará indisponível.');
+  }
+
+  logYoutubeProviderState();
 
   // process.execPath: o executavel exato deste Node, sem depender do "node" no PATH.
   const startedAt = Date.now();

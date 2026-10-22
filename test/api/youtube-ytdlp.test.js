@@ -98,6 +98,19 @@ test('não encontra yt-dlp quando o caminho configurado não existe', async () =
     await fsp.rm(dir, { recursive: true, force: true });
 });
 
+test('encontra yt-dlp pelo pacote do WinGet mesmo sem LOCALAPPDATA no ambiente', async () => {
+    const dir = await tempRoot();
+    const packageDir = path.join(dir, 'yt-dlp.yt-dlp_teste');
+    await fsp.mkdir(packageDir, { recursive: true });
+    const binary = path.join(packageDir, 'yt-dlp.exe');
+    await fsp.writeFile(binary, 'fake');
+
+    const found = await findYtDlpBinary({ env: { PATH: '' }, winGetDir: dir, fs: fsp });
+    assert.equal(found, binary);
+
+    await fsp.rm(dir, { recursive: true, force: true });
+});
+
 test('encontra yt-dlp no PATH informado', async () => {
     const dir = await tempRoot();
     const binary = path.join(dir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
@@ -128,7 +141,7 @@ test('encontra yt-dlp instalado pelo WinGet mesmo fora do PATH', async () => {
 
 test('yt-dlp ausente devolve erro de dependência acionável', async () => {
     await assert.rejects(
-        prepareMediaWithYtDlp('audio', { url: videoUrl }, { binary: '' }),
+        prepareMediaWithYtDlp('audio', { url: videoUrl }, { binary: null }),
         (error) => error.code === ErrorCodes.DEPENDENCY_MISSING
             && /yt-dlp/i.test(error.userMessage)
     );

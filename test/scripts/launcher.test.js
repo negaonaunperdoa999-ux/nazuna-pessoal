@@ -31,11 +31,11 @@ async function launcherSandbox({ startupBody = 'console.log("[SANDBOX] startup r
     return dir;
 }
 
-function runLauncher(dir, { env = {}, timeoutMs = 20000 } = {}) {
+function runLauncher(dir, { env = {}, fullEnv = null, timeoutMs = 20000 } = {}) {
     return new Promise((resolve) => {
         const child = spawn(process.execPath, [startScript], {
             cwd: dir,
-            env: {
+            env: fullEnv || {
                 ...process.env,
                 // sem "node" no PATH: um spawn por nome falharia
                 PATH: path.join(dir, 'sem-node'),
@@ -126,6 +126,182 @@ test('o launcher sobe o startup.js mesmo sem "node" no PATH', async () => {
         assert.match(result.stdout, /\[SANDBOX\] startup rodou/, `saida: ${result.stdout}\nerros: ${result.stderr}`);
         assert.match(result.stdout, /Arquivo principal: .*startup\.js/);
         assert.doesNotMatch(result.stdout, /spawn node ENOENT/);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('o launcher injeta as pastas do yt-dlp e do FFmpeg no PATH do bot', async () => {
+    const dir = await launcherSandbox({
+        startupBody: 'console.log("[SANDBOX] PATH=" + process.env.PATH); setInterval(() => {}, 1000);'
+    });
+    const toolsDir = path.join(dir, 'tools');
+    await fsp.mkdir(toolsDir, { recursive: true });
+    const ytDlp = path.join(toolsDir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    const ffmpeg = path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    await fsp.writeFile(ytDlp, 'fake');
+    await fsp.writeFile(ffmpeg, 'fake');
+
+    try {
+        const result = await runLauncher(dir, {
+            timeoutMs: 8000,
+            env: {
+                NAZUNA_YOUTUBE_YTDLP_PATH: ytDlp,
+                NAZUNA_YOUTUBE_FFMPEG_PATH: ffmpeg
+            }
+        });
+
+        assert.match(result.stdout, /\[SANDBOX\] PATH=(.*)/, `saida: ${result.stdout}`);
+        const childPath = result.stdout.match(/\[SANDBOX\] PATH=(.*)/)[1];
+        assert.ok(childPath.includes(toolsDir), `o PATH do bot deve conter a pasta do yt-dlp/ffmpeg (${childPath})`);
+        assert.match(result.stdout, /yt-dlp disponível no PATH do bot/);
+        assert.match(result.stdout, /FFmpeg disponível para miniaturas/);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('o launcher informa o provider do YouTube e avisa quando o fallback da VexAPI está ativo', async () => {
+    const dir = await launcherSandbox();
+
+    try {
+        await fsp.writeFile(
+            path.join(dir, 'dados', 'src', 'config.json'),
+            JSON.stringify({ api: { youtube: { provider: 'auto', allowVexFallback: true } } }),
+            'utf8'
+        );
+
+        const result = await runLauncher(dir, { timeoutMs: 8000 });
+
+        assert.match(result.stdout, /YouTube: provider=auto fallbackVex=ATIVO/, `saida: ${result.stdout}`);
+        assert.match(result.stdout, /Fallback da VexAPI ATIVO/);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('sem configuracao, o launcher mostra o provider local sem fallback da VexAPI', async () => {
+    const dir = await launcherSandbox();
+
+    try {
+        const result = await runLauncher(dir, { timeoutMs: 8000 });
+
+        assert.match(result.stdout, /YouTube: provider=local fallbackVex=desativado/, `saida: ${result.stdout}`);
+        assert.doesNotMatch(result.stdout, /Fallback da VexAPI ATIVO/);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+/**
+ * Reconstrói o ambiente do processo com a chave do PATH em uma caixa específica
+ * (o Windows usa "Path") ou sem PATH algum.
+ */
+function envWithPathKey(key, value) {
+    const env = {};
+    for (const [nome, conteudo] of Object.entries(process.env)) {
+        if (nome.toUpperCase() === 'PATH') continue;
+        env[nome] = conteudo;
+    }
+    if (key) env[key] = value;
+    return env;
+}
+
+test('o launcher sobe quando o PATH do Windows vem com a chave "Path" (sem "PATH")', async () => {
+    const dir = await launcherSandbox({
+        startupBody: 'console.log("[SANDBOX] PATH=" + process.env.PATH); setInterval(() => {}, 1000);'
+    });
+    const toolsDir = path.join(dir, 'tools');
+    await fsp.mkdir(toolsDir, { recursive: true });
+    const ytDlp = path.join(toolsDir, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+    const ffmpeg = path.join(toolsDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    await fsp.writeFile(ytDlp, 'fake');
+    await fsp.writeFile(ffmpeg, 'fake');
+
+    const fullEnv = envWithPathKey('Path', path.join(dir, 'sem-node'));
+    fullEnv.NAZUNA_YOUTUBE_YTDLP_PATH = ytDlp;
+    fullEnv.NAZUNA_YOUTUBE_FFMPEG_PATH = ffmpeg;
+
+    try {
+        const result = await runLauncher(dir, { fullEnv, timeoutMs: 8000 });
+
+        assert.doesNotMatch(
+            result.stdout,
+            /Erro inesperado/,
+            `o launcher não pode quebrar com o PATH em "Path" (saida: ${result.stdout}\nerros: ${result.stderr})`
+        );
+        assert.doesNotMatch(result.stdout, /reading 'split'/);
+        assert.match(result.stdout, /\[SANDBOX\] PATH=/, `saida: ${result.stdout}\nerros: ${result.stderr}`);
+
+        const childPath = result.stdout.match(/\[SANDBOX\] PATH=(.*)/)[1];
+        assert.ok(
+            childPath.includes(toolsDir),
+            `as pastas do yt-dlp/FFmpeg devem entrar no PATH do bot (${childPath})`
+        );
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('sem PATH no ambiente, o launcher não quebra e ainda sobe o bot', async () => {
+    const dir = await launcherSandbox();
+
+    // No Windows o próprio sistema devolve um PATH mesmo quando o processo
+    // não o tem, então a checagem é feita no código e o cenário é validado
+    // pelo comportamento: o launcher nunca pode quebrar.
+    const source = await fsp.readFile(startScript, 'utf8');
+    assert.match(source, /PATH não encontrado no ambiente/);
+    assert.match(source, /NAZUNA_YOUTUBE_YTDLP_PATH/);
+
+    const fullEnv = envWithPathKey(null, null);
+
+    try {
+        const result = await runLauncher(dir, { fullEnv, timeoutMs: 8000 });
+
+        assert.doesNotMatch(result.stdout, /reading 'split'/);
+        assert.doesNotMatch(result.stdout, /Erro inesperado/, `saida: ${result.stdout}\nerros: ${result.stderr}`);
+        assert.match(result.stdout, /\[SANDBOX\] startup rodou/, `saida: ${result.stdout}\nerros: ${result.stderr}`);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('o launcher completa um config.json incompleto sem perder o que já exists', async () => {
+    const dir = await launcherSandbox();
+
+    try {
+        const configPath = path.join(dir, 'dados', 'src', 'config.json');
+        await fsp.writeFile(configPath, JSON.stringify({ prefixo: '#' }), 'utf8');
+
+        const result = await runLauncher(dir, { timeoutMs: 8000 });
+
+        assert.doesNotMatch(result.stdout, /Erro inesperado/, `saida: ${result.stdout}\nerros: ${result.stderr}`);
+        assert.match(result.stdout, /config\.json incompleto/, `saida: ${result.stdout}`);
+
+        const repaired = JSON.parse(await fsp.readFile(configPath, 'utf8'));
+        assert.equal(repaired.prefixo, '#', 'o prefixo do usuário precisa ser preservado');
+        assert.equal(repaired.nomebot, 'Nazuna');
+        assert.equal(typeof repaired.numerodono, 'string');
+        assert.equal(repaired.modoaluguel, false);
+    } finally {
+        await removeDir(dir);
+    }
+});
+
+test('o launcher cria o config.json com prefixo quando ele não existe', async () => {
+    const dir = await launcherSandbox();
+
+    try {
+        const configPath = path.join(dir, 'dados', 'src', 'config.json');
+        await fsp.rm(configPath, { force: true });
+
+        const result = await runLauncher(dir, { timeoutMs: 8000 });
+
+        assert.match(result.stdout, /config\.json criado com valores padrão/, `saida: ${result.stdout}`);
+
+        const created = JSON.parse(await fsp.readFile(configPath, 'utf8'));
+        assert.equal(created.prefixo, '!');
+        assert.ok(created.prefixo.length > 0);
     } finally {
         await removeDir(dir);
     }

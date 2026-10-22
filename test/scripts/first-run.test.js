@@ -86,11 +86,13 @@ test('sem config.json, o início NÃO abre o configurador e chega ao menu de con
 test('o start.js nunca chama npm run config automaticamente', async () => {
     const source = await fsp.readFile(startScript, 'utf8');
 
-    assert.doesNotMatch(source, /npm['"]\s*,\s*\[['\"]run['"]\s*,\s*['"]config['"]/);
-    assert.doesNotMatch(source, /Iniciando configura[çc][ãa]o autom[áa]tica/);
-    assert.match(source, /config:install/);
-    assert.match(source, /DEFAULT_CONFIG/);
-});
+      assert.doesNotMatch(source, /npm['"]\s*,\s*\[['\"]run['"]\s*,\s*['"]config['"]/);
+      assert.doesNotMatch(source, /Iniciando configura[çc][ãa]o autom[áa]tica/);
+      assert.match(source, /config:install/);
+      // os valores padrao do config.json vem do modulo compartilhado
+      assert.match(source, /defaultConfig\.js/);
+      assert.match(source, /normalizeConfig/);
+  });
 
 test('a leitura do config da pasta do index.js tolera arquivo ausente', async () => {
     const { carregarConfigLocal } = await import('../../dados/src/funcs/API.js');

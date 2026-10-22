@@ -312,6 +312,22 @@ function searchCacheKey(provider, query) {
     return JSON.stringify([provider, query]);
 }
 
+function annotateFallback(error, usedFallback) {
+    if (!usedFallback || !error) return error;
+
+    const prefix = '[fallback VexAPI] ';
+    const userMessage = String(error.userMessage || '');
+    if (!userMessage || userMessage.startsWith(prefix)) return error;
+
+    return new ApiError(error.code || ErrorCodes.UPSTREAM, {
+        message: error.message,
+        userMessage: prefix + userMessage,
+        recoverable: error.recoverable,
+        details: error.details || null,
+        cause: error
+    });
+}
+
 export async function runYoutubeSearch(input, options = {}) {
     const normalized = normalizeYoutubeInput(input);
     if (normalized.kind !== 'query') {
@@ -320,6 +336,7 @@ export async function runYoutubeSearch(input, options = {}) {
 
     const runtime = resolveRuntime(options);
     let lastError;
+    let usedFallback = false;
 
     for (let index = 0; index < runtime.chain.length; index++) {
         const providerName = runtime.chain[index];
@@ -360,14 +377,20 @@ export async function runYoutubeSearch(input, options = {}) {
             lastError = normalizedError;
 
             if (!shouldFallback(runtime.provider, normalizedError, index, runtime.chain)) {
-                throw normalizedError;
+                break;
             }
+
+            usedFallback = true;
+            console.log(`[youtube:busca] provider=${providerName} falhou (${normalizedError.message}); usando ${runtime.chain[index + 1]}`);
         }
     }
 
-    throw lastError || new ApiError(ErrorCodes.INTERNAL, {
-        message: 'Nenhum provedor de busca do YouTube disponível'
-    });
+    throw annotateFallback(
+        lastError || new ApiError(ErrorCodes.INTERNAL, {
+            message: 'Nenhum provedor de busca do YouTube disponível'
+        }),
+        usedFallback
+    );
 }
 
 async function prepareAndDownload(kind, input, options) {
@@ -390,6 +413,7 @@ async function prepareAndDownload(kind, input, options) {
     }
 
     let lastError;
+    let usedFallback = false;
     for (let index = 0; index < runtime.chain.length; index++) {
         const providerName = runtime.chain[index];
         let prepared;
@@ -424,8 +448,11 @@ async function prepareAndDownload(kind, input, options) {
             lastError = normalizedError;
 
             if (!shouldFallback(runtime.provider, normalizedError, index, runtime.chain)) {
-                throw normalizedError;
+                break;
             }
+
+            usedFallback = true;
+            console.log(`[youtube:midia] provider=${providerName} falhou (${normalizedError.message}); usando ${runtime.chain[index + 1]}`);
             continue;
         }
 
@@ -483,9 +510,12 @@ async function prepareAndDownload(kind, input, options) {
         }
     }
 
-    throw lastError || new ApiError(ErrorCodes.INTERNAL, {
-        message: 'Nenhum provedor de YouTube disponível'
-    });
+    throw annotateFallback(
+        lastError || new ApiError(ErrorCodes.INTERNAL, {
+            message: 'Nenhum provedor de YouTube disponível'
+        }),
+        usedFallback
+    );
 }
 
 export async function runYoutubeAudio(input, options = {}) {

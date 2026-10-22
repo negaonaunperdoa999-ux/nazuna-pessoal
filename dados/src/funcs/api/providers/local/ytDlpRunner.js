@@ -19,6 +19,7 @@ import { constants as fsConstants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn as defaultSpawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const DEFAULT_TIMEOUT_MS = 180000;
 const DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -75,24 +76,34 @@ async function findInWinGetPackages(kind, options = {}) {
 
     const fsImpl = options.fs || fsp;
     const env = options.env || process.env;
-    const root = options.winGetDir
-        || (env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages') : '');
+    const roots = [];
 
-    if (!root) return null;
+    const addRoot = (root) => {
+        if (root && !roots.includes(root)) roots.push(root);
+    };
 
-    let entries = [];
-    try {
-        entries = await fsImpl.readdir(root, { withFileTypes: true });
-    } catch {
-        return null;
-    }
+    addRoot(options.winGetDir);
+    if (env.LOCALAPPDATA) addRoot(path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages'));
+
+    const home = env.USERPROFILE || env.HOME || os.homedir();
+    if (home) addRoot(path.join(home, 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages'));
+    addRoot(path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages'));
 
     const prefix = kind === 'ffmpeg' ? 'yt-dlp.FFmpeg' : 'yt-dlp.yt-dlp';
 
-    for (const entry of entries) {
-        if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue;
-        const found = await findExecutableInTree(fsImpl, path.join(root, entry.name), binaryNames(kind), 2);
-        if (found) return found;
+    for (const root of roots) {
+        let entries = [];
+        try {
+            entries = await fsImpl.readdir(root, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+
+        for (const entry of entries) {
+            if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue;
+            const found = await findExecutableInTree(fsImpl, path.join(root, entry.name), binaryNames(kind), 2);
+            if (found) return found;
+        }
     }
 
     return null;
@@ -147,7 +158,20 @@ export async function findBinary(kind, options = {}) {
         }
     }
 
-    return findInWinGetPackages(kind, { ...options, fs: fsImpl, env });
+    const found = await findInWinGetPackages(kind, { ...options, fs: fsImpl, env });
+    if (found) return found;
+
+    // Ultimo recurso: a propria pasta do projeto (bin/yt-dlp.exe) e o diretorio
+    // do node_modules, que podem ter sido usados em uma instalacao local.
+    const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
+    for (const dir of [path.join(projectRoot, 'bin'), path.join(projectRoot, 'node_modules', '.bin')]) {
+        for (const name of binaryNames(kind)) {
+            const candidate = path.join(dir, name);
+            if (await isExecutable(fsImpl, candidate)) return candidate;
+        }
+    }
+
+    return null;
 }
 
 export function findYtDlpBinary(options = {}) {
