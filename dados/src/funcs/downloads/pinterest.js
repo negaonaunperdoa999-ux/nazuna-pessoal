@@ -1,8 +1,5 @@
-import https from 'https';
-import fs from 'fs';
-import verificarAPI, { carregarConfigLocal } from '../API.js';
-
-const CONFIG_FILE = carregarConfigLocal();;
+import { downloadPinterestPin, isPinterestPinUrl } from '../api/providers/local/pinterest.js';
+import { searchPinterestLocal } from '../api/providers/local/pinterestSearch.js';
 
 const cache = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
@@ -25,112 +22,59 @@ function setCache(key, val) {
   cache.set(key, { val, ts: Date.now() });
 }
 
-function request(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          reject(new Error('Resposta inválida da API'));
-        }
-      });
-    }).on('error', reject);
-  });
+async function search(query, options = {}) {
+  const text = String(query ?? '').trim();
+  if (!text) {
+    return { ok: false, msg: 'Digite um termo para pesquisar no Pinterest.' };
+  }
+
+  const cacheKey = `search:${text.toLowerCase()}`;
+  const cached = getCached(cacheKey);
+  if (cached) return { ok: true, ...cached, cached: true };
+
+  const local = await searchPinterestLocal(text, options);
+  if (!local.ok) return local;
+
+  const result = {
+    type: 'image',
+    query: local.query,
+    count: local.count,
+    urls: local.results.map(item => item.url),
+    results: local.results,
+    fonte: 'local'
+  };
+
+  setCache(cacheKey, result);
+
+  return { ok: true, ...result };
 }
 
-async function search(query) {
-
-  const checkAPI = await verificarAPI();
-  if (checkAPI !== true) return { ok: false, msg: checkAPI };
-
-  try {
-
-    if (!query) {
-      return { ok: false, msg: 'Termo de pesquisa inválido' };
-    }
-
-    const cached = getCached(`search:${query.toLowerCase()}`);
-    if (cached) return { ok: true, ...cached, cached: true };
-
-    const { apikey_vex, site_vex } = CONFIG_FILE;
-
-    const url = `${site_vex}/api/pesquisa/pinterest?apikey=${apikey_vex}&query=${encodeURIComponent(query)}`;
-
-    const data = await request(url);
-
-    const checkAfter = await verificarAPI(data);
-    if (checkAfter !== true) return { ok: false, msg: checkAfter };
-
-    if (!data?.status || !data?.results?.length) {
-      return { ok: false, msg: 'Nenhuma imagem encontrada' };
-    }
-
-    const urls = data.results.map(r => r.directLink).filter(Boolean);
-
-    const result = {
-      criador: 'Hiudy',
-      type: 'image',
-      mime: 'image/jpeg',
-      query,
-      count: urls.length,
-      urls
-    };
-
-    setCache(`search:${query.toLowerCase()}`, result);
-
-    return { ok: true, ...result };
-
-  } catch (err) {
-    return { ok: false, msg: err.message };
+async function dl(url, options = {}) {
+  if (!url) {
+    return { ok: false, msg: 'URL inválida' };
   }
-}
 
-async function dl(url) {
-
-  const checkAPI = await verificarAPI();
-  if (checkAPI !== true) return { ok: false, msg: checkAPI };
-
-  try {
-
-    if (!url) {
-      return { ok: false, msg: 'URL inválida' };
-    }
-
-    const cached = getCached(`download:${url}`);
-    if (cached) return { ok: true, ...cached, cached: true };
-
-    const { apikey_vex, site_vex } = CONFIG_FILE;
-
-    const api = `${site_vex}/api/pesquisas/pinterest?apikey=${apikey_vex}&query=${encodeURIComponent(url)}`;
-
-    const data = await request(api);
-
-    const checkAfter = await verificarAPI(data);
-    if (checkAfter !== true) return { ok: false, msg: checkAfter };
-
-    if (!data?.status || !data?.results?.length) {
-      return { ok: false, msg: 'Não foi possível obter o conteúdo' };
-    }
-
-    const urls = data.results.map(r => r.directLink).filter(Boolean);
-
-    const result = {
-      criador: 'Tokyo',
-      type: 'image',
-      mime: 'image/jpeg',
-      urls
-    };
-
-    setCache(`download:${url}`, result);
-
-    return { ok: true, ...result };
-
-  } catch (err) {
-    return { ok: false, msg: err.message };
+  if (!isPinterestPinUrl(url)) {
+    return { ok: false, msg: 'Envie um link de pin do Pinterest (ou use o comando com um termo de busca).' };
   }
+
+  const local = await downloadPinterestPin(url, options);
+
+  if (!local.ok) {
+    return { ok: false, msg: local.msg, etapa: local.etapa, code: local.code };
+  }
+
+  return {
+    ok: true,
+    type: local.type,
+    buffer: local.buffer,
+    mimetype: local.mimetype,
+    fileName: local.fileName,
+    title: local.title,
+    sizeBytes: local.sizeBytes,
+    urls: local.type === 'image' && local.thumbnail ? [local.thumbnail] : [],
+    local: true
+  };
 }
 
 export {

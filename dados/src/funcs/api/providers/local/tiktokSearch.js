@@ -1,25 +1,3 @@
-/**
- * Provider local de BUSCA textual do TikTok.
- *
- * Situação real verificada em 2026-10-21 (ver `relatorio-inventario-apis.md`):
- *   - `yt-dlp` NÃO tem busca textual do TikTok: `ytsearch` é o extrator do
- *     YouTube e devolve URLs do YouTube (confirmado empiricamente).
- *   - A página pública de busca do TikTok é apenas um "shell": os resultados
- *     chegam por uma requisição assinada (msToken/X-Bogus). Gerar essa
- *     assinatura é burlar controle anti-bot -> não é feito aqui.
- *   - Endpoints públicos gratuitos que existiam (tikwm, tiklydown) hoje
- *     respondem 403/desconhecidos.
- *
- * O provider fica organizado e pronto: se o TikTok voltar a embutir os
- * resultados na página (ou se o dono configurar uma fonte de busca), a
- * busca passa a funcionar sem nenhuma alteração de código.
- *
- * A VexAPI só é usada como fonte alternativa QUANDO o dono configurou
- * site_vex + apikey_vex (nunca como fallback silencioso) e a origem usada
- * é devolvida e registrada em log.
- */
-
-import { getVexSettings } from '../../config.js';
 import { hostMatches, isValidHttpUrl } from './ytDlpRunner.js';
 
 export const TIKTOK_SEARCH_MAX_RESULTS = 5;
@@ -27,9 +5,9 @@ export const TIKTOK_SEARCH_TIMEOUT_MS = 20000;
 export const TIKTOK_SEARCH_MAX_BYTES = 8 * 1024 * 1024;
 
 const TIKTOK_HOSTS = ['tiktok.com'];
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+const USER_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
-export const TIKTOK_SEARCH_BLOCKED_MESSAGE = 'A busca textual do TikTok não está disponível localmente: a página pública do TikTok exige requisição assinada (anti-bot) e não existe fonte pública sem chave funcionando hoje. Envie um link do TikTok ou configure a api-key da Vex para usar a busca legada.';
+export const TIKTOK_SEARCH_BLOCKED_MESSAGE = 'A busca textual do TikTok não retornou vídeos acessíveis localmente para este termo. A busca completa exige requisição assinada; a página pública de descoberta só entrega resultados para alguns termos. Envie um link do TikTok.';
 
 export function validateSearchQuery(query) {
     const text = String(query ?? '').trim();
@@ -79,6 +57,49 @@ export function dedupeResults(results, limit = TIKTOK_SEARCH_MAX_RESULTS) {
     return saida;
 }
 
+function decodeHtmlEntities(value) {
+    return String(value)
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x27;/gi, "'")
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>');
+}
+
+function extractAttribute(tag, name) {
+    const match = String(tag || '').match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, 'i'));
+    return match ? decodeHtmlEntities(match[1]) : '';
+}
+
+export function extractTikTokDiscoverResults(html, limit = TIKTOK_SEARCH_MAX_RESULTS) {
+    const blocks = String(html || '').split(/data-e2e=["']video-item["']/i).slice(1);
+    const encontrados = [];
+
+    for (const block of blocks) {
+        const id = block.match(/(?:aweme%2Fdetail%2F|aweme\/detail\/|\/video\/)(\d{5,})/i)?.[1];
+        if (!id) continue;
+
+        const imgTag = block.match(/<img\b[^>]*>/i)?.[0] || '';
+        const alt = extractAttribute(imgTag, 'alt');
+        const author = alt.match(/\(@([^)]+)\)/)?.[1]?.trim() || '';
+        if (!author) continue;
+
+        let title = alt.replace(/^[\s\S]*?\(@[^)]+\):\s*/i, '').trim();
+        title = title.replace(/^["“]|["”]$/g, '').trim();
+
+        encontrados.push({
+            videoId: id,
+            url: `https://www.tiktok.com/@${author}/video/${id}`,
+            title,
+            author,
+            type: 'video'
+        });
+    }
+
+    return dedupeResults(encontrados, limit);
+}
+
 function extrairItensDaPagina(html) {
     const bloco = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
     if (!bloco) return [];
@@ -112,12 +133,12 @@ function extrairItensDaPagina(html) {
     return encontrados;
 }
 
-/**
- * Busca local na página pública do TikTok.
- * @returns {Promise<{ok: boolean, results: Array, msg?: string, etapa?: string}>}
- */
 export async function searchTikTokLocal(query, options = {}) {
     const fetchImpl = options.fetchImpl || globalThis.fetch;
+    if (typeof fetchImpl !== 'function') {
+        return { ok: false, msg: 'Não foi possível consultar o TikTok neste ambiente.', etapa: 'busca' };
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(
         () => controller.abort(),
@@ -126,8 +147,9 @@ export async function searchTikTokLocal(query, options = {}) {
 
     try {
         const resposta = await fetchImpl(
-            `https://www.tiktok.com/search?q=${encodeURIComponent(query)}`,
+            `https://www.tiktok.com/discover/${encodeURIComponent(query)}`,
             {
+                redirect: 'follow',
                 headers: {
                     'User-Agent': options.userAgent || USER_AGENT,
                     'Accept-Language': 'pt-BR,pt;q=0.9',
@@ -137,7 +159,7 @@ export async function searchTikTokLocal(query, options = {}) {
             }
         );
 
-        if (!resposta.ok) {
+        if (resposta.ok === false || Number(resposta.status) >= 400) {
             return { ok: false, msg: `O TikTok respondeu HTTP ${resposta.status} na busca.`, etapa: 'busca' };
         }
 
@@ -146,25 +168,27 @@ export async function searchTikTokLocal(query, options = {}) {
             return { ok: false, msg: 'A resposta da busca do TikTok excedeu o limite aceitável.', etapa: 'busca' };
         }
 
-        const itens = extrairItensDaPagina(html);
-        const resultados = dedupeResults(
-            itens.map((item) => ({
-                videoId: item?.id,
-                title: item?.desc || item?.title || '',
-                author: item?.author?.uniqueId || item?.author?.nickname || '',
-                url: item?.author?.uniqueId && item?.id
-                    ? `https://www.tiktok.com/@${item.author.uniqueId}/video/${item.id}`
-                    : '',
-                type: item?.music?.original ? 'audio' : 'video'
-            })),
-            options.limit
-        );
+        const descoberta = extractTikTokDiscoverResults(html, options.limit);
+        const itens = descoberta.length
+            ? descoberta
+            : dedupeResults(
+                extrairItensDaPagina(html).map((item) => ({
+                    videoId: item?.id,
+                    title: item?.desc || item?.title || '',
+                    author: item?.author?.uniqueId || item?.author?.nickname || '',
+                    url: item?.author?.uniqueId && item?.id
+                        ? `https://www.tiktok.com/@${item.author.uniqueId}/video/${item.id}`
+                        : '',
+                    type: item?.music?.original ? 'audio' : 'video'
+                })),
+                options.limit
+            );
 
-        if (!resultados.length) {
+        if (!itens.length) {
             return { ok: false, msg: TIKTOK_SEARCH_BLOCKED_MESSAGE, etapa: 'busca' };
         }
 
-        return { ok: true, results: resultados, fonte: 'local' };
+        return { ok: true, results: itens, fonte: 'local' };
     } catch (error) {
         const mensagem = error?.name === 'AbortError'
             ? 'A busca no TikTok demorou demais.'
@@ -175,13 +199,6 @@ export async function searchTikTokLocal(query, options = {}) {
     }
 }
 
-/**
- * Busca do TikTok com fonte local e, opcionalmente, a fonte legada da VexAPI
- * (somente quando o dono configurou site_vex + apikey_vex).
- *
- * @param {string} query
- * @param {{fallbackSearch?: Function, config?: object, env?: object}} options
- */
 export async function searchTikTok(query, options = {}) {
     const validacao = validateSearchQuery(query);
     if (!validacao.ok) {
@@ -190,37 +207,16 @@ export async function searchTikTok(query, options = {}) {
 
     const local = await searchTikTokLocal(validacao.query, options);
 
-    if (local.ok) {
-        return {
-            ok: true,
-            results: local.results,
-            urls: local.results.map((item) => item.url),
-            type: local.results[0]?.type || 'video',
-            title: local.results[0]?.title || '',
-            fonte: 'local'
-        };
+    if (!local.ok) {
+        return { ok: false, msg: local.msg, etapa: local.etapa || 'busca', fonte: 'local' };
     }
 
-    const settings = getVexSettings(options.config || {});
-    const fallback = typeof options.fallbackSearch === 'function' ? options.fallbackSearch : null;
-
-    if (fallback && settings.siteVex && settings.apiKey) {
-        console.log(`[tiktok:busca] fonte local indisponivel (${local.msg}) -> usando fonte legada da VexAPI (configurada pelo dono)`);
-        try {
-            const legado = await fallback(validacao.query);
-            if (legado?.ok) {
-                return {
-                    ...legado,
-                    results: dedupeResults((legado.urls || []).map((url) => ({ url, title: legado.title || '' })), options.limit),
-                    fonte: 'vex'
-                };
-            }
-            return { ok: false, msg: legado?.msg || local.msg, etapa: 'busca', fonte: 'vex' };
-        } catch (error) {
-            return { ok: false, msg: local.msg, etapa: 'busca', fonte: 'vex' };
-        }
-    }
-
-    console.log(`[tiktok:busca] fonte local indisponivel: ${local.msg}`);
-    return { ok: false, msg: local.msg, etapa: 'busca', fonte: 'local' };
+    return {
+        ok: true,
+        results: local.results,
+        urls: local.results.map((item) => item.url),
+        type: local.results[0]?.type || 'video',
+        title: local.results[0]?.title || '',
+        fonte: 'local'
+    };
 }

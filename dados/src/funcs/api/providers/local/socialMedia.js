@@ -14,6 +14,7 @@ import {
     hostMatches,
     isValidHttpUrl
 } from './ytDlpRunner.js';
+import { classifyFacebookUrl, downloadFacebookPhoto } from './facebookPhoto.js';
 
 export const SOCIAL_PLATFORMS = Object.freeze({
     tiktok: {
@@ -94,8 +95,54 @@ function mapError(error, platform) {
     return `Não foi possível baixar do ${config.label}.`;
 }
 
+async function runWithSelectors(targetUrl, selectors, { binary, ffmpegPath, options, maxBytes }) {
+    let media = null;
+    let lastError = null;
+    let usedSelector = null;
+
+    for (const selector of selectors) {
+        try {
+            media = await downloadMediaWithYtDlp(targetUrl, {
+                binary,
+                ffmpegPath,
+                fs: options.fs,
+                spawn: options.spawn,
+                signal: options.signal,
+                timeoutMs: options.timeoutMs,
+                maxBytes,
+                tempRoot: options.tempRoot,
+                extraArgs: ['-f', selector]
+            });
+            usedSelector = selector;
+            break;
+        } catch (error) {
+            lastError = error;
+            const semFormato = /not available|requested format|unable to extract/i.test(String(error?.message || ''));
+            if (!semFormato) break;
+        }
+    }
+
+    return { media, lastError, usedSelector };
+}
+
+async function tryFacebookPhoto(url, options, config) {
+    const foto = await downloadFacebookPhoto(url, {
+        fetch: options.fetch,
+        timeoutMs: options.timeoutMs,
+        maxBytes: Math.min(Number(options.maxBytes) || config.maxBytes, 32 * 1024 * 1024)
+    });
+
+    if (foto.ok) return { payload: foto };
+    if (foto.code === 'video') return { retryUrl: foto.resolvedUrl || url };
+
+    console.error(`[socialMedia] provider=facebook etapa=foto falha=${foto.msg}`);
+    return { error: { ok: false, msg: foto.msg, etapa: 'foto', code: foto.code } };
+}
+
 /**
  * Baixa a mídia de uma plataforma social usando o yt-dlp local.
+ * Fotos do Facebook (photo.php?fbid=...) são resolvidas pelos metadados
+ * públicos da página, porque o yt-dlp só extrai vídeos.
  * @returns {Promise<{ok: boolean, msg?: string, type?: string, title?: string, buffer?: Buffer, mimetype?: string, fileName?: string, thumbnail?: string, resolution?: string, cleanup?: Function}>}
  */
 export async function downloadSocialMedia(platform, url, options = {}) {
@@ -111,6 +158,21 @@ export async function downloadSocialMedia(platform, url, options = {}) {
 
     if (!hostMatches(url, config.hosts)) {
         return { ok: false, msg: `O link informado não é do ${config.label}.` };
+    }
+
+    const facebookKind = platform === 'facebook' ? classifyFacebookUrl(url).kind : null;
+    let targetUrl = url;
+
+    // O yt-dlp nao extrai fotos do Facebook (photo.php?fbid=... cai no extrator
+    // generico e termina em "Unsupported URL"). A foto publica e resolvida
+    // pelos metadados da pagina ANTES de exigir o binario; quando a pagina
+    // exige login, devolvemos a mensagem especifica e nao tentamos inventar
+    // uma URL de video.
+    if (facebookKind === 'photo') {
+        const foto = await tryFacebookPhoto(url, options, config);
+        if (foto.payload) return foto.payload;
+        if (foto.error) return foto.error;
+        if (foto.retryUrl) targetUrl = foto.retryUrl;
     }
 
     // binary === null  -> nao detecta (ambiente sem yt-dlp, para teste/diagnostico)
@@ -134,29 +196,24 @@ export async function downloadSocialMedia(platform, url, options = {}) {
         ? options.formatSelector
         : (config.formatSelectors || ['best']);
 
-    let media = null;
-    let lastError = null;
-    let usedSelector = null;
+    const maxBytes = options.maxBytes ?? config.maxBytes;
+    let attempt = await runWithSelectors(targetUrl, selectors, { binary, ffmpegPath, options, maxBytes });
+    let media = attempt.media;
+    let lastError = attempt.lastError;
+    let usedSelector = attempt.usedSelector;
 
-    for (const selector of selectors) {
-        try {
-            media = await downloadMediaWithYtDlp(url, {
-                binary,
-                ffmpegPath,
-                fs: options.fs,
-                spawn: options.spawn,
-                signal: options.signal,
-                timeoutMs: options.timeoutMs,
-                maxBytes: options.maxBytes ?? config.maxBytes,
-                tempRoot: options.tempRoot,
-                extraArgs: ['-f', selector]
-            });
-            usedSelector = selector;
-            break;
-        } catch (error) {
-            lastError = error;
-            const semFormato = /not available|requested format|unable to extract/i.test(String(error?.message || ''));
-            if (!semFormato) break;
+    // Link compartilhado (/share/...) ou post: quando o yt-dlp nao reconhece,
+    // consulta os metadados publicos para diferenciar foto de video. A capa
+    // de um video nunca e enviada como se fosse a midia pedida.
+    if (!media && platform === 'facebook' && facebookKind === 'unknown') {
+        const foto = await tryFacebookPhoto(targetUrl, options, config);
+        if (foto.payload) return foto.payload;
+        if (foto.error) return foto.error;
+        if (foto.retryUrl && foto.retryUrl !== targetUrl) {
+            attempt = await runWithSelectors(foto.retryUrl, selectors, { binary, ffmpegPath, options, maxBytes });
+            media = attempt.media;
+            lastError = attempt.lastError;
+            usedSelector = attempt.usedSelector;
         }
     }
 

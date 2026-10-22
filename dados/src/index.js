@@ -553,7 +553,6 @@ const fileExistsAsync = async (filePath) => {
 
 const modules = await import('./funcs/exports.js');
 const {
-  tiktok,
   totext,
   tts,
   pinterest,
@@ -1326,7 +1325,7 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       }
       // TikTok
       else if (urlLower.includes('tiktok.com') || urlLower.includes('vt.tiktok.com')) {
-        downloadModule = tiktok;
+        downloadModule = null;
         platformName = 'TikTok';
       }
       // Instagram
@@ -1373,34 +1372,27 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
       }
 
       // TikTok
-      // TikTok
       else if (platformName === 'TikTok') {
 
         // Aviso antes de qualquer verificação/download
         await nazu.sendMessage(from, { text: 'Aguarde um momentinho... ☀️' }, { quoted: info });
 
-        const result = await tiktok.dl(url);
+        const result = await downloadSocialMedia('tiktok', url);
+        const midia = buildSocialMediaPayload(result);
 
-        if (!result?.ok) {
-          // Mostra só a mensagem de erro da API
-          await nazu.sendMessage(from, { text: result.msg || 'Erro desconhecido' }, { quoted: info });
+        if (!midia.ok) {
+          await nazu.sendMessage(from, { text: `❌ ${midia.msg}` }, { quoted: info });
           return false;
         }
 
-        if (result.urls?.length > 0) {
-          const videoUrl = result.urls[0];
+        await nazu.sendMessage(from, {
+          [midia.type]: midia.media,
+          ...(midia.caption ? { caption: `📱 *TikTok*\n\n${midia.caption}` } : {}),
+          ...(midia.mimetype ? { mimetype: midia.mimetype } : {}),
+          ...(midia.fileName ? { fileName: midia.fileName } : {})
+        }, { quoted: info });
 
-          await nazu.sendMessage(from, {
-            video: { url: videoUrl },
-            caption: `📱 *TikTok*\n\n${result.title || ''}`,
-            mimetype: 'video/mp4'
-          }, { quoted: info });
-
-          return true;
-        }
-
-        await nazu.sendMessage(from, { text: '❌ Nenhum vídeo disponível para este TikTok.' }, { quoted: info });
-        return false;
+        return true;
       }
 
       // Instagram
@@ -1456,36 +1448,44 @@ async function NazuninhaBotExec(nazu, info, store, messagesCache, rentalExpirati
 
       // Facebook
       else if (platformName === 'Facebook') {
-        result = await facebook.downloadHD(url);
-        if (result && result.ok && result.buffer) {
-          await nazu.sendMessage(from, {
-            video: result.buffer,
-            caption: `📘 *Facebook* - ${result.resolution || 'HD'}`,
-            mimetype: 'video/mp4'
-          }, { quoted: info });
-          return true;
+        // Mesmo provider local do comando !facebook: fotos sao identificadas
+        // e enviadas como imagem (o adaptador legado so tratava video).
+        const fbResult = await downloadSocialMedia('facebook', url);
+        const fbMidia = buildSocialMediaPayload(fbResult);
+
+        if (!fbMidia.ok) {
+          await nazu.sendMessage(from, { text: `❌ ${fbMidia.msg}` }, { quoted: info });
+          return false;
         }
+
+        await nazu.sendMessage(from, {
+          [fbMidia.type]: fbMidia.media,
+          ...(fbMidia.type === 'image' ? { caption: '📘 *Facebook* - Foto' } : {}),
+          ...(fbMidia.mimetype ? { mimetype: fbMidia.mimetype } : {}),
+          ...(fbMidia.fileName ? { fileName: fbMidia.fileName } : {})
+        }, { quoted: info });
+        return true;
       }
 
       // Pinterest
       else if (platformName === 'Pinterest') {
         result = await pinterest.dl(url);
-        if (result && result.ok && result.urls && result.urls.length > 0) {
-          const mediaUrl = result.urls[0];
-          if (result.type === 'video') {
-            await nazu.sendMessage(from, {
-              video: { url: mediaUrl },
-              caption: '📌 *Pinterest*',
-              mimetype: 'video/mp4'
-            }, { quoted: info });
-          } else {
-            await nazu.sendMessage(from, {
-              image: { url: mediaUrl },
-              caption: '📌 *Pinterest*'
-            }, { quoted: info });
-          }
-          return true;
+        const pinMedia = buildSocialMediaPayload(result);
+
+        if (!pinMedia.ok) {
+          await nazu.sendMessage(from, { text: `❌ ${pinMedia.msg}` }, { quoted: info });
+          return false;
         }
+
+        await nazu.sendMessage(from, {
+          [pinMedia.type]: pinMedia.media,
+          ...(pinMedia.type === 'image'
+            ? { caption: pinMedia.caption ? `📌 *Pinterest*\n\n${pinMedia.caption}` : '📌 *Pinterest*' }
+            : {}),
+          ...(pinMedia.mimetype ? { mimetype: pinMedia.mimetype } : {}),
+          ...(pinMedia.fileName ? { fileName: pinMedia.fileName } : {})
+        }, { quoted: info });
+        return true;
       }
 
       // Spotify - baixar áudio
@@ -19100,7 +19100,34 @@ ${prefix}addsubbot @152656307871952`
             return reply(datinha.msg);
           }
 
-          if (!datinha.urls || datinha.urls.length === 0) {
+          // Pin resolvido pelo provider local: a midia ja vem baixada (Buffer),
+          // com o tipo real (video ou imagem). Antes o comando enviava todo
+          // resultado como imagem, inclusive pins de video.
+          if (datinha.buffer) {
+            const midia = buildSocialMediaPayload(datinha);
+
+            if (!midia.ok) {
+              console.error(`[pinterest] midia indisponivel (etapa=${midia.etapa}): ${midia.msg}`);
+              return reply(`❌ ${midia.msg}`);
+            }
+
+            console.log(`[pinterest] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}`);
+
+            const caption = midia.caption
+              ? `📌 *Pinterest*\n\n📝 ${midia.caption}`
+              : '📌 *Pinterest*';
+
+            await nazu.sendMessage(from, {
+              [midia.type]: midia.media,
+              ...(midia.type === 'image' ? { caption } : {}),
+              ...(midia.mimetype ? { mimetype: midia.mimetype } : {}),
+              ...(midia.fileName ? { fileName: midia.fileName } : {})
+            }, { quoted: info });
+
+            return;
+          }
+
+          if (!Array.isArray(datinha.urls) || datinha.urls.length === 0) {
             return reply(isPinUrl
               ? 'Não foi possível baixar este link do Pinterest. 😕'
               : 'Nenhuma imagem encontrada para o termo pesquisado. 😕'
@@ -19341,10 +19368,7 @@ ${prefix}addsubbot @152656307871952`
           const isTikTokUrl = /tiktok\.com/i.test(q);
           const tiktokPromise = isTikTokUrl
             ? downloadSocialMedia('tiktok', q)
-            : searchTikTok(q, {
-                config: config,
-                fallbackSearch: tiktok.search
-              });
+            : searchTikTok(q);
 
           tiktokPromise
             .then(async (datinha) => {
@@ -19403,7 +19427,7 @@ ${prefix}addsubbot @152656307871952`
             return reply('❌ Por favor, envie um link válido do Facebook.');
           }
 
-          await reply('📹 Baixando vídeo do Facebook em HD... Aguarde!');
+          await reply('📥 Baixando mídia do Facebook... Aguarde!');
 
           downloadSocialMedia('facebook', q)
             .then(async (result) => {
@@ -19422,19 +19446,25 @@ ${prefix}addsubbot @152656307871952`
                 return reply(`❌ ${midia.msg}`);
               }
 
-              console.log(`[facebook] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}`);
+              console.log(`[facebook] midia pronta tipo=${midia.type} bytes=${midia.sizeBytes || 0}${result.via ? ` via=${result.via}` : ''}`);
+
+              const isPhoto = midia.type === 'image';
+              const titulo = String(result.title || '').trim();
 
               const qualities = Array.isArray(result.allQualities) ? result.allQualities : [];
               const qualityList = qualities.map((item, i) =>
                 `${i + 1}. ${item.resolution}`
               ).join('\n');
 
-              const caption = `📹 *Vídeo Baixado com Sucesso!* 📹\n\n` +
-                `📊 *Qualidade:* ${result.resolution}\n` +
-                (qualities.length > 0 ? `\n🎬 *Qualidades disponíveis:*\n${qualityList}\n` : '') +
-                `\n📥 *Enviando vídeo...*`;
+              const caption = isPhoto
+                ? `🖼️ *Foto do Facebook*${titulo ? `\n\n📝 ${titulo}` : ''}\n\n📥 *Enviando imagem...*`
+                : `📹 *Vídeo Baixado com Sucesso!* 📹\n\n` +
+                  `📊 *Qualidade:* ${result.resolution}\n` +
+                  (qualities.length > 0 ? `\n🎬 *Qualidades disponíveis:*\n${qualityList}\n` : '') +
+                  `\n📥 *Enviando vídeo...*`;
 
-              if (result.thumbnail) {
+              // Em foto, a miniatura seria a propria imagem: envia apenas a midia.
+              if (!isPhoto && result.thumbnail) {
                 try {
                   await nazu.sendMessage(from, {
                     image: { url: result.thumbnail },
@@ -19448,20 +19478,21 @@ ${prefix}addsubbot @152656307871952`
               try {
                 await nazu.sendMessage(from, {
                   [midia.type]: midia.media,
-                  mimetype: midia.mimetype || (midia.type === 'image' ? 'image/jpeg' : 'video/mp4'),
+                  ...(isPhoto ? { caption } : {}),
+                  mimetype: midia.mimetype || (isPhoto ? 'image/jpeg' : 'video/mp4'),
                   fileName: midia.fileName
                 }, { quoted: info });
               } catch (videoError) {
                 if (String(videoError).includes("ENOSPC") || String(videoError).includes("size")) {
-                  await reply('📦 Vídeo muito grande, enviando como documento...');
+                  await reply('📦 Arquivo muito grande, enviando como documento...');
                   await nazu.sendMessage(from, {
                     document: midia.media,
                     fileName: midia.fileName,
-                    mimetype: midia.mimetype || 'video/mp4'
+                    mimetype: midia.mimetype || 'application/octet-stream'
                   }, { quoted: info });
                 } else {
-                  console.error('Erro ao enviar vídeo do Facebook:', videoError);
-                  reply('❌ Ocorreu um erro ao enviar o vídeo.');
+                  console.error('Erro ao enviar mídia do Facebook:', videoError);
+                  reply('❌ Ocorreu um erro ao enviar a mídia do Facebook.');
                 }
               }
             })

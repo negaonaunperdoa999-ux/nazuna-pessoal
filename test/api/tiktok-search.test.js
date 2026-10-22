@@ -1,14 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
     TIKTOK_SEARCH_BLOCKED_MESSAGE,
     dedupeResults,
+    extractTikTokDiscoverResults,
     normalizeSearchResult,
     searchTikTok,
     searchTikTokLocal,
     validateSearchQuery
 } from '../../dados/src/funcs/api/providers/local/tiktokSearch.js';
+
+const TIKTOK_SEARCH_SOURCE = fileURLToPath(new URL(
+    '../../dados/src/funcs/api/providers/local/tiktokSearch.js',
+    import.meta.url
+));
 
 function htmlComResultados(itens) {
     const bloco = {
@@ -22,6 +30,20 @@ function htmlComResultados(itens) {
         }
     };
     return `<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">${JSON.stringify(bloco)}</script></html>`;
+}
+
+function htmlDiscover(itens) {
+    const cards = itens.map((item) => `
+        <div data-e2e="video-item">
+            <a href="https://app-va.tiktokv.com/redirect/?redirect_url=snssdk1233%3A%2F%2Faweme%2Fdetail%2F${item.id}%3Finsert_feed%3D1">
+                <img alt="10K Likes, 20 Comments. TikTok video from ${item.autor} (@${item.autor}): &quot;${item.desc}&quot;">
+            </a>
+        </div>`).join('');
+    return `<html><body>${cards}</body></html>`;
+}
+
+function semResultados() {
+    return '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{}}</script></html>';
 }
 
 test('valida a consulta textual', () => {
@@ -62,7 +84,20 @@ test('deduplica e limita os resultados', () => {
     assert.deepEqual(dedupeResults([], 5), []);
 });
 
-test('a fonte local extrai resultados reais da página pública', async () => {
+test('extrai os cards reais da página pública de descoberta', () => {
+    const results = extractTikTokDiscoverResults(htmlDiscover([
+        { id: '7111111111111111111', desc: 'Billie Jean', autor: 'artista1' },
+        { id: '7222222222222222222', desc: 'Outro vídeo', autor: 'artista2' }
+    ]));
+
+    assert.equal(results.length, 2);
+    assert.equal(results[0].url, 'https://www.tiktok.com/@artista1/video/7111111111111111111');
+    assert.equal(results[0].author, 'artista1');
+    assert.equal(results[0].title, 'Billie Jean');
+    assert.equal(results[1].videoId, '7222222222222222222');
+});
+
+test('a fonte local extrai itens do JSON quando a página os embute', async () => {
     const fetchImpl = async () => ({
         ok: true,
         status: 200,
@@ -81,19 +116,56 @@ test('a fonte local extrai resultados reais da página pública', async () => {
     assert.equal(resultado.results[1].type, 'audio');
 });
 
-test('a fonte local informa o bloqueio concreto quando o TikTok não devolve itens', async () => {
-    const fetchImpl = async () => ({
-        ok: true,
-        status: 200,
-        text: async () => '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{}}</script></html>'
+test('a fonte local usa /discover e devolve o formato esperado', async () => {
+    let requestedUrl = '';
+    const resultado = await searchTikTok('billie jean', {
+        fetchImpl: async (url, options) => {
+            requestedUrl = url;
+            assert.match(options.headers['User-Agent'], /iPhone/);
+            return {
+                ok: true,
+                status: 200,
+                text: async () => htmlDiscover([
+                    { id: '7333333333333333333', desc: 'Billie Jean', autor: 'artista3' }
+                ])
+            };
+        }
     });
 
-    const resultado = await searchTikTokLocal('billie jean', { fetchImpl });
+    assert.match(requestedUrl, /^https:\/\/www\.tiktok\.com\/discover\/billie%20jean$/);
+    assert.equal(resultado.ok, true);
+    assert.equal(resultado.fonte, 'local');
+    assert.equal(resultado.urls[0], 'https://www.tiktok.com/@artista3/video/7333333333333333333');
+    assert.equal(resultado.title, 'Billie Jean');
+    assert.equal(resultado.type, 'video');
+});
+
+test('a fonte local informa a indisponibilidade sem recomendar VexAPI', async () => {
+    const resultado = await searchTikTokLocal('billie jean', {
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => semResultados() })
+    });
 
     assert.equal(resultado.ok, false);
     assert.equal(resultado.etapa, 'busca');
-    assert.match(resultado.msg, /não está disponível localmente/i);
     assert.equal(resultado.msg, TIKTOK_SEARCH_BLOCKED_MESSAGE);
+    assert.doesNotMatch(resultado.msg, /vex|api-key|apikey|chave/i);
+});
+
+test('nunca chama fallback externo, mesmo com chave configurada', async () => {
+    let fallbackChamado = false;
+    const resultado = await searchTikTok('billie jean', {
+        config: { site_vex: 'https://vex.example', apikey_vex: 'chave' },
+        fallbackSearch: async () => {
+            fallbackChamado = true;
+            return { ok: true, urls: ['https://www.tiktok.com/@x/video/1'], type: 'video', title: 'x' };
+        },
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => semResultados() })
+    });
+
+    assert.equal(fallbackChamado, false);
+    assert.equal(resultado.ok, false);
+    assert.equal(resultado.fonte, 'local');
+    assert.doesNotMatch(resultado.msg, /vex|api-key|apikey|chave/i);
 });
 
 test('timeout e falha de rede viram mensagens claras', async () => {
@@ -114,63 +186,7 @@ test('timeout e falha de rede viram mensagens claras', async () => {
     assert.match(rede.msg, /Falha de rede/i);
 });
 
-test('a VexAPI não é chamada quando o dono não configurou a chave', async () => {
-    let fallbackChamado = false;
-    const resultado = await searchTikTok('billie jean', {
-        config: { site_vex: '', apikey_vex: '' },
-        fallbackSearch: async () => {
-            fallbackChamado = true;
-            return { ok: true, urls: ['https://www.tiktok.com/@x/video/1'], type: 'video', title: 'x' };
-        },
-        fetchImpl: async () => ({
-            ok: true,
-            status: 200,
-            text: async () => '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{}}</script></html>'
-        })
-    });
-
-    assert.equal(fallbackChamado, false, 'a VexAPI não pode ser chamada sem chave configurada');
-    assert.equal(resultado.ok, false);
-    assert.equal(resultado.fonte, 'local');
-    assert.match(resultado.msg, /não está disponível localmente/i);
-});
-
-test('a fonte legada só entra com chave configurada e a origem fica explícita', async () => {
-    let fallbackChamado = false;
-    const resultado = await searchTikTok('billie jean', {
-        config: { site_vex: 'https://vex.example', apikey_vex: 'chave' },
-        fallbackSearch: async () => {
-            fallbackChamado = true;
-            return { ok: true, urls: ['https://www.tiktok.com/@x/video/1'], type: 'video', title: 'x' };
-        },
-        fetchImpl: async () => ({
-            ok: true,
-            status: 200,
-            text: async () => '<html><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{}}</script></html>'
-        })
-    });
-
-    assert.equal(fallbackChamado, true);
-    assert.equal(resultado.ok, true);
-    assert.equal(resultado.fonte, 'vex');
-    assert.equal(resultado.urls[0], 'https://www.tiktok.com/@x/video/1');
-});
-
-test('a busca local devolve o formato esperado pelo comando', async () => {
-    const resultado = await searchTikTok('billie jean', {
-        config: {},
-        fetchImpl: async () => ({
-            ok: true,
-            status: 200,
-            text: async () => htmlComResultados([
-                { id: '7333333333333333333', desc: 'Billie Jean', autor: 'artista3' }
-            ])
-        })
-    });
-
-    assert.equal(resultado.ok, true);
-    assert.equal(resultado.fonte, 'local');
-    assert.equal(resultado.urls[0], 'https://www.tiktok.com/@artista3/video/7333333333333333333');
-    assert.equal(resultado.title, 'Billie Jean');
-    assert.equal(resultado.type, 'video');
+test('o provider do TikTok não depende mais da VexAPI', () => {
+    const fonte = fs.readFileSync(TIKTOK_SEARCH_SOURCE, 'utf8');
+    assert.doesNotMatch(fonte, /getVexSettings|verificarAPI|carregarConfigLocal|site_vex|apikey_vex|api\/pesquisa\/tiktok/i);
 });
