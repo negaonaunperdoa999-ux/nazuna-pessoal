@@ -22,7 +22,7 @@
 | `!facebook` em link de **foto** (`photo.php?fbid=…`) terminava em `ERROR: Unsupported URL` | O `yt-dlp` **não tem extrator de fotos do Facebook**: só vídeos (`facebook`, `facebook:reel`, `FacebookPluginsVideo`…). O link caía no extrator genérico | Novo `providers/local/facebookPhoto.js`: classifica `photo.php?fbid` como foto, lê `og:image`/`og:video` da página pública e baixa a imagem validada (magic bytes, host `fbcdn.net`/`facebook.com`, limite 32 MB). `downloadSocialMedia` resolve a foto **antes** de exigir o `yt-dlp`; `!facebook` e o autodownload usam `buildSocialMediaPayload` e enviam o tipo real (imagem/vídeo). Páginas com login devolvem mensagem específica; nunca enviam a capa como se fosse o vídeo |
 | `!pinterest` tratava **todo** pin como imagem e dependia da VexAPI até para link | O wrapper `downloads/pinterest.js` chamava `verificarAPI()` antes de tudo e enviava `urls[0]` como imagem, inclusive em pin de vídeo; o `yt-dlp` local suporta o vídeo, e a imagem está nos metadados públicos | Novo `providers/local/pinterest.js`: vídeo via `yt-dlp` (H.264 + áudio, com fallback de seletores) e imagem via `og:image`/`originals` (mesmo hash). O wrapper é **100% local**, sem `verificarAPI`, sem `site_vex`/`apikey_vex` e sem fallback Vex. `!pinterest` e o autodownload enviam pelo tipo real |
 | Busca textual do TikTok/Pinterest sem chave e dependente da VexAPI | A busca do TikTok era shell assinada; a do Pinterest (desktop) não trazia resultados; o código ainda aceitava fallback Vex e recomendava a chave | `tiktokSearch.js` usa a página pública **móvel** `/discover/<termo>` (cards SSR) e não chama fallback externo; `pinterestSearch.js` usa a página móvel de busca (`__PWS_INITIAL_PROPS__`/`BaseSearchResource`), exige sinal de relevância (`rankedGuides`/vertical) para não devolver pins genéricos e não pede chave. Nenhuma chamada à Vex nesses fluxos |
-| Logos podiam enviar JSON/HTML de erro como se fosse imagem | `funcs/logos/index.js` fazia `requestJSON` e `requestBuffer` na mesma URL sem checar status, `Content-Type` ou assinatura; resposta 200 de erro virava `image` no Baileys | `requestJSON`/`requestBuffer` agora checam HTTP, têm timeout e o Buffer é validado por magic bytes (JPEG/PNG/WebP/GIF). Resposta inválida/vazia vira mensagem clara; dependências injetáveis permitem testar sem rede |
+| Logos podiam enviar JSON/HTML de erro como se fosse imagem e dependiam da VexAPI | `funcs/logos/index.js` fazia duas requisições à Vex sem checar status/`Content-Type`/assinatura; resposta 200 de erro virava `image` no Baileys, e sem `apikey_vex` o comando falhava | O módulo foi migrado para **geração local** (`funcs/logos/local.js`): SVG 1024×1024 + `sharp` → PNG, 38 estilos próprios, cache de 1h/200 entradas e validação de texto. Não há `verificarAPI`, `site_vex`, `apikey_vex` nem chamada HTTP no fluxo de logos |
 | `TypeError: Cannot read properties of undefined (reading 'length')` em `index.js` ao processar qualquer mensagem (inclusive `!menu`) | `dados/src/config.json` estava vazio (`{}`), então `config.prefixo` era `undefined` → `groupPrefix` (`groupData.customPrefix \|\| prefixo`) ficava `undefined` → `groupPrefix.length` estourava em `index.js:2203`. A origem do `{}` foi o runner de testes, que criava um config vazio temporário | `dados/src/utils/defaultConfig.js` (defaults + `normalizeConfig`) é usado pelo launcher (que agora **completa** configs incompletos sem apagar o que o usuário configurou) e pelo `index.js` (normalização em memória); `dados/src/utils/messageFilters.js` resolve o prefixo (`resolveCommandPrefix`, nunca `undefined`) e filtra mensagens de sistema (`shouldIgnoreSystemMessage`, mantendo revogação/anti-delete, revisões e stubs); o runner de testes agora salva/restaura o config original e usa uma config completa |
 | QR Code falha com `Cannot read properties of undefined (reading 'split')` | O launcher injetava as pastas do `yt-dlp`/FFmpeg no PATH do processo filho lendo `env.PATH` de uma cópia `{ ...process.env }`. No Windows a variável real é `Path` (minúsculo) e a cópia não normaliza a caixa: `env.PATH` ficava `undefined` e o `.split()` estourava | `findEnvKey(env, 'PATH')` localiza a chave real (qualquer caixa) e a reescreve na mesma chave; sem PATH no ambiente o launcher avisa com mensagem clara e sobe o bot sem as ferramentas |
 
@@ -195,24 +195,41 @@ Legenda da coluna **Classe**: `API externa` · `site externo/scraping` · `provi
 | `!letra`, `!lyrics` | VexAPI | Não existe fonte local de letras |
 | `!tts`, `!tss`, `!totext` | VexAPI | TTS local exigiria modelo de voz (dependência pesada) |
 | `!edits` | VexAPI | Edição remota de imagem; `sharp` local resolve só parte dos casos |
-| `!pornhub` e demais logos | VexAPI (`/api/logos/<tipo>`) | **Não é template local**: as marcas não existem no repositório (`dados/midias/` só tem `menu.jpg`). Implementação local exigiria incorporar os assets (licença) → mantido, sem inventar imagens |
 | `!canvas` (bratvideo/welcome2), `!removebg`/`!upscale` | VexAPI | `canvas.dl`/`imagetools` usam `runBrat` (API própria) em parte das funções, mas `bratvideo`, `welcome2`, `removebg` e `upscale` ainda chamam a VexAPI → mantidos |
 
 
-### 2.6b Logos (`!pornhub` e afins) — API externa da Vex, resposta validada
+### 2.6b Logos (`!pornhub` e afins) — geração local com SVG + `sharp`
 
 | Campo | Conteúdo |
 |---|---|
 | 1. Aliases | `!pornhub`, `!avengers`, `!deadpool`, `!marvel` (+ `!amongus`, `!royal`, `!mascotemetal`, `!firework`, `!summerbeach`, `!cloudsky`, `!techstyle`, `!watercolor`, `!ligatures`, `!graffitistyle`, `!frozen`, `!colorful`, `!balloon`, `!multicolor`, `!metal`, `!doubleexposure`, `!mascoteneon`, `!eraser`, `!america`, `!snow`, `!sunset`, `!halloween`, `!blood`, `!hallobat`, `!cemiterio`, `!ffavatar`, `!vintage3d`, `!hollywood`, `!glitch`, `!galaxy`, `!glossy`, `!dragonfire`, `!pubgavatar`, `!comics`) — **38 no total** (34 de 1 texto + 4 de 2 textos) |
-| 2. Responsável | `dados/src/funcs/logos/index.js` → `gerarLogo({query,type})` (1 txt) / `gerarLogo2({query,query2,type})` (2 txt); menu em `dados/src/menus/menulogo.js`; roteador em `index.js` (`//COMANDOS DE LOGOS`) |
-| 3. Serviço | **VexAPI**: `${site_vex}/api/logos/<tipo>?apikey=…&query=…` (1 txt) e `${site_vex}/api/duallogos/<tipo>?apikey=…&query=…&text2=…` (2 txt); a logo é **gerada no servidor** |
-| 4. Depende da VexAPI? | **Sim** |
-| 5. Usa a API própria? | Não (a validação do Buffer é local) |
-| 6. Autenticação | `apikey_vex` |
-| 7. Estado | 38 comandos roteados e cobertos por teste de menu; formato/argumentos preservados (`!pornhub puro/talento` → `query`/`query2`). **Correção defensiva:** resposta JSON/HTML de erro (mesmo HTTP 200) ou Buffer vazio agora falha com mensagem clara; só JPEG/PNG/WebP/GIF válidos são enviados. **Não validado em rede real** porque o ambiente não tem `apikey_vex`; sem chave a Vex responde com a mensagem de configuração (mantida). **Não é edição de template local**: as marcas não existem no repositório (`dados/midias/` contém apenas `menu.jpg`) |
-| 8. Migração possível | Seria preciso incorporar os arquivos de marca (licença) ou um gerador local por template; `sharp` já está instalado, mas **faltam os assets**. Sem assets, não há implementação local confiável → manter na Vex e documentar |
-| 9. Testes necessários | `test/api/logos.test.js` (8: assinaturas, 1txt/2txt, erro JSON, resposta não-imagem/vazia, chave ausente, cache) + `test/menus/menulogo.test.js` (cobertura dos 38 comandos) — ambos existem e passam |
-| 10. Prioridade/risco | Baixa (comando depende da Vex; sem chave falha com mensagem clara). Risco residual: formato real da resposta da Vex não confirmado nesta rodada |
+| 2. Responsável | `dados/src/funcs/logos/local.js` (gerador e fallback por estilo) + `dados/src/funcs/logos/renderers/` (13 cenas dedicadas) + `dados/src/funcs/logos/index.js` (fachada) → `gerarLogo({query,type})` (1 txt) / `gerarLogo2({query,query2,type})` (2 txt); menu em `dados/src/menus/menulogo.js`; roteador em `index.js` (`//COMANDOS DE LOGOS`) |
+| 3. Serviço | **Geração local**: cada comando tem uma configuração visual própria; o texto é escapado e convertido em SVG 1024×1024, renderizado para PNG com `sharp`. 13 estilos têm cena dedicada (`renderers/dual.js`, `singles.js`, `singles-extra.js`); os outros 25 usam o renderer por estilo (fundo, decoração e efeito). `pornhub` usa os dois textos na mesma linha; `avengers`/`marvel`/`deadpool` usam layout empilhado. Sem requisição HTTP |
+| 4. Depende da VexAPI? | **Não** — o módulo não importa `verificarAPI`/`carregarConfigLocal` e não lê `site_vex`/`apikey_vex` |
+| 5. Usa a API própria? | Não; pipeline local (`SVG` + `sharp`) com cache em memória de 1h/200 entradas |
+| 6. Autenticação | Nenhuma |
+| 7. Estado | Migração funcional concluída. Os 38 comandos geram PNG local válido sem chave; configurações visuais únicas verificadas; entradas vazias/longas e estilo desconhecido falham com mensagem clara; os dois argumentos dos comandos duais são preservados. Os 13 estilos com referência foram reconstruídos como cenas próprias e comparados visualmente; os 25 restantes usam composições por estilo. **Fidelidade visual aproximada**: não é uma reprodução pixel-perfect dos assets/efeitos originais da Vex |
+| 8. Migração possível | **Feita localmente** — não foram incorporados assets de marca; o gerador cria composições originais por template. Fontes dependem do sistema (Arial/Georgia/Impact/Segoe etc.), então o resultado pode variar entre máquinas |
+| 9. Testes | `test/api/logos.test.js` (9: configurações únicas, renderizadores dedicados das 13 referências e escape, geração dos 38, textos duais, escape/emoji, entradas inválidas, payload Baileys, cache, ausência de Vex) + `test/menus/menulogo.test.js` (menu e 38 cases) — todos passam |
+| 10. Prioridade/risco | Resolvido funcionalmente. Risco residual: fidelidade visual e disponibilidade das fontes do sistema; `sharp` é peer dependency e precisa existir no ambiente; não foi validado em conversa real no WhatsApp nesta rodada |
+
+**Referências visuais recebidas (13 JPEGs):** `pornhub`, `marvel`, `deadpool`, `avengers`, `amongus`,
+`royal`, `mascotemetal`, `firework`, `summerbeach`, `cloudsky`, `techstyle`, `watercolor` e, com confiança
+média, `ligatures`. As imagens foram extraídas para análise temporária e não são distribuídas nem embutidas
+no projeto; o código usa apenas geometria, gradientes, filtros SVG e fontes do sistema.
+
+**Renderizadores dedicados:** `renderers/shared.js` concentra métricas de texto, ajuste de fonte, gradientes,
+filtros e formas; `renderers/dual.js` contém `pornhub`, `deadpool`, `avengers` e `marvel`; `renderers/singles.js`
+contém `amongus`, `royal`, `mascotemetal`, `firework` e `summerbeach`; `renderers/singles-extra.js` contém
+`cloudsky`, `techstyle`, `watercolor` e `ligatures`. O `local.js` consulta `getRenderer(type)` antes do
+pipeline genérico.
+
+**Validação visual (2026-10-22):** os 13 PNGs foram renderizados em 1024×1024 com `sharp` e revisados em
+comparação com as referências. Ajustes aplicados: layout e `textLength` dos duais; escudo e bevel do
+`avengers`; chrome e skew do `marvel`; caverna/leões do `royal`; esquilo e tipografia do `mascotemetal`;
+skyline baixo e fogos densos do `firework`; texto entalhado e areia do `summerbeach`; coração de nuvem e
+texto menor no `cloudsky`; plataforma 3D no `techstyle`; aguada mais difusa no `watercolor`; asfalto escuro
+e folhas orgânicas no `ligatures`. A fidelidade é de composição, não pixel-perfect.
 
 ### 2.7 Processamento local de mídia (sem serviço externo)
 
@@ -260,10 +277,10 @@ Legenda da coluna **Classe**: `API externa` · `site externo/scraping` · `provi
 
 | Classe | Domínios/mecanismos |
 |---|---|
-| **VexAPI (paga, desativada por padrão)** | `site_vex` + `apikey_vex` → Lyrics, TTS/ToText, Edits, Logos (38 comandos), canvas/imagetools (legado), YouTube legado (`funcs/downloads/youtube.js`). **TikTok e Pinterest não estão mais aqui** |
+| **VexAPI (paga, desativada por padrão)** | `site_vex` + `apikey_vex` → Lyrics, TTS/ToText, Edits, canvas/imagetools (legado), YouTube legado (`funcs/downloads/youtube.js`). **TikTok, Pinterest e Logos não estão mais aqui** |
 | **API externa de terceiros** | `api.fishfish.gg` (tradutor), `tenor.googleapis.com` (emojimix), `api.qrserver.com` (QR), `info.tweeload.site`/`pastebin.com` (Twitter), `api.vreden.my.id`/`spotisaver.net` (Spotify), `api.github.com` (update) |
 | **Site externo / scraping** | `nayan-video-downloader.vercel.app` (SoundCloud auxiliar), `soundcloud.com` + `api-v2.soundcloud.com` (SoundCloud nativo), `pinterest.com`/`i.pinimg.com` (pin e busca móvel), `tiktok.com` (descoberta por palavra-chave), `apkmodct.com`, `modrinth.com`, `hubsteam.com.br`, `drive.google.com`, `mediafire`, `*.sirv.com`, `dos.zone`/`cdn.dos.zone` (js-dos), `wttr.in` (clima) |
-| **Provider local (API própria)** | YouTube (`yt-search` + watch page + `yt-dlp` + FFmpeg), SoundCloud (api-v2 nativo), brat (imagem local), TikTok/Instagram/Facebook (yt-dlp), Facebook fotos (`og:image`), Pinterest pins (yt-dlp + `og:image`/`originals`), busca Pinterest (`BaseSearchResource`), busca TikTok (`/discover`) |
+| **Provider local (API própria)** | YouTube (`yt-search` + watch page + `yt-dlp` + FFmpeg), SoundCloud (api-v2 nativo), brat (imagem local), Logos (SVG + `sharp`, 38 estilos), TikTok/Instagram/Facebook (yt-dlp), Facebook fotos (`og:image`), Pinterest pins (yt-dlp + `og:image`/`originals`), busca Pinterest (`BaseSearchResource`), busca TikTok (`/discover`) |
 | **Biblioteca local de mídia** | `sharp` (imagem/WebP), `node-webpmux` (sticker), `ffmpeg`/`fluent-ffmpeg` (áudio/vídeo), `cheerio`/`linkedom` (parsing HTML), `yt-search` (busca) |
 | **Template/arquivo local** | DOOM (js-dos vendorizado), GBA (GBA.js vendorizado, falta `bios.bin`), AIRich, `dados/midias/menu.jpg`, `dados/src/funcs/json/*` |
 | **Dependência desconhecida** | `linkedom`/`cheerio` usados em `funcs/edits` e `utils` para parse de HTML de terceiros (a confirmar por comando na auditoria detalhada) |
@@ -280,7 +297,7 @@ Legenda da coluna **Classe**: `API externa` · `site externo/scraping` · `provi
 | 4 | **Instagram / Facebook (download)** | Provider local via yt-dlp; Facebook fotos via `og:image` | feito | médio (cookies no IG; fotos do FB geralmente exigem login) | Média — feita e validada em rede real (vídeo); fotos com limitação documentada |
 | 4b | **Twitter/X** | serviço gratuito já funcional | — | — | Mantido (legenda rica) |
 | 5 | **Spotify** | hoje usa `api.vreden.my.id` + `spotisaver.net` | médio | médio | Média |
-| 6 | **Logos (`/pornhub`)** | precisa dos assets de marca (licença); resposta agora validada localmente | alto | alto | Baixa — mantido |
+| 6 | **Logos (`/pornhub`)** | Gerador local SVG + `sharp`, 38 estilos próprios, sem assets externos | feito | médio (fidelidade visual/fontes do sistema) | Média — resolvido funcionalmente |
 | 7 | **Lyrics / TTS / ToText / Edits** | provider por capacidade; TTS local exigiria modelo | alto | alto | Baixa — mantido |
 | 8 | **Pinterest (pin)** | Provider local: yt-dlp (vídeo) + `og:image`/`originals` (imagem) | feito | baixo | Média — resolvido e validado em rede real |
 | 8b | **Pinterest (busca textual)** | Página pública móvel (`BaseSearchResource`) com sinal de relevância | feito | baixo/médio (SSR pode mudar) | Média — resolvida e validada em rede real |
@@ -297,12 +314,11 @@ a plataforma tem regras próprias; serviço externo apenas quando necessário e 
 
 - Provider padrão da API do YouTube: `local` (`api/config.js`).
 - `allowVexFallback`: **false** por padrão. A Vex só é acionada com `provider=auto` **e** `allowVexFallback=true`.
-- Comandos legados baseados na Vex (Logos, Lyrics, TTS…) **exigem `site_vex` + `apikey_vex`** configurados pelo
+- Comandos legados baseados na Vex (Lyrics, TTS…) **exigem `site_vex` + `apikey_vex`** configurados pelo
   dono (`!apikey`); sem isso devolvem "Api-key não configurada" — falha explícita, nunca sucesso simulado.
-- **Links de pin do Pinterest** (`/pin/…`, `pin.it/…`), **downloads de TikTok/Instagram/Facebook** e as **buscas
-  textuais de TikTok/Pinterest** funcionam sem Vex; não há fallback automático para a chave nesses fluxos.
-- Logos: o próprio bot valida a assinatura da imagem antes de enviar; sem chave, o comando não chama a API e
-  devolve a mensagem de configuração.
+- **Links de pin do Pinterest** (`/pin/…`, `pin.it/…`), **downloads de TikTok/Instagram/Facebook**, as **buscas
+  textuais de TikTok/Pinterest** e os **38 Logos** funcionam sem Vex; não há fallback automático para a chave nesses fluxos.
+- Logos: a imagem é gerada localmente em PNG e validada antes do envio; não há chave, endpoint ou fallback Vex.
 - Nenhuma chave/token/cookie é registrado em log nesta auditoria (apenas host/rota sem query string).
 
 ---
@@ -327,10 +343,10 @@ a plataforma tem regras próprias; serviço externo apenas quando necessário e 
 
 | Tipo | Onde | Resultado |
 |---|---|---|
-| **Unitário/simulado** | `test/api/*` (youtube, youtube-commands, youtube-local-provider, youtube-ytdlp, youtube-baileys-media, soundcloud, social-media, media, policy, brat, **facebook-photo, pinterest-local, pinterest-search, tiktok-search, logos**) + `test/menus/menulogo.test.js` + `test/scripts/*` (launcher, startup-flow, first-run, gba-lazy, configurator) | `test/run-tests.mjs` → **270 testes: 267 passaram, 3 de rede pulados** |
+| **Unitário/simulado** | `test/api/*` (youtube, youtube-commands, youtube-local-provider, youtube-ytdlp, youtube-baileys-media, soundcloud, social-media, media, policy, brat, **facebook-photo, pinterest-local, pinterest-search, tiktok-search, logos**) + `test/menus/menulogo.test.js` + `test/scripts/*` (launcher, startup-flow, first-run, gba-lazy, configurator) | `test/run-tests.mjs` → **270 testes: 267 passaram, 3 de rede pulados**. Logos: 8 testes locais + 2 de menu; PNG real gerado para os 38 comandos |
 | **Rede real (sem WhatsApp)** | YouTube (busca+download+ffprobe), SoundCloud (`searchDownload` → `.m4a` AAC 283,5 s), TikTok (2.004.627 B `video/mp4`), Facebook vídeo (4.331.930 B `h264/High/yuv420p 1280×720 62,51 s` + `aac/LC`, temporários removidos), **Pinterest imagem (1.198.962 B `image/png`, `originals`)**, **Pinterest vídeo (2.251.913 B `video/mp4`, `avc1`+áudio)**, Instagram (erro de cookies mapeado), Facebook foto (página sem `og:image` → mensagem clara, sem `Unsupported URL`), **busca Pinterest `flores` → 24 pins; imagem 101.769 B JPEG**, **busca TikTok `baralho` → 4 vídeos; primeiro 5.897.298 B `video/mp4`**, provider do YouTube via o pipeline real do Baileys (bytes idênticos ao arquivo) | OK |
 | **Integração de busca (gated)** | `NAZUNA_NETWORK_TESTS=1 node --test test/integration/search-network.test.js` | **3/3** (Pinterest real, Pinterest sem resultados genéricos, TikTok real) |
-| **WhatsApp real** | `!play` (áudio) confirmado pelo dono; `!play2`/`!ytmp4` (áudio e vídeo) enviados com keys `3EB063EC9400F6B46E62A9` e `3EB08AC97BF41E9F9C9459` | OK — **reenvio pendente** após as correções de TikTok/IG/FB (reiniciar o bot) |
+| **WhatsApp real** | `!play` (áudio) confirmado pelo dono; `!play2`/`!ytmp4` (áudio e vídeo) enviados com keys `3EB063EC9400F6B46E62A9` e `3EB08AC97BF41E9F9C9459` | OK — **reenvio pendente** após as correções de TikTok/IG/FB (reiniciar o bot). **Logos locais ainda não foram testados em conversa real** |
 
 ## 8. Pendências técnicas conhecidas
 
@@ -341,12 +357,13 @@ a plataforma tem regras próprias; serviço externo apenas quando necessário e 
 3. `dados/src/funcs/downloads/youtube.js` (Vex legado) continua no repositório como fallback explícito — remover
    somente depois de validar o substituto no WhatsApp real.
 4. Comandos da Vex dependem de chave do dono: sem ela falham de forma explícita (não há substituto local confiável
-   para logos, TTS e lyrics sem novos assets/dependências).
+   para TTS e lyrics sem novos assets/dependências). **Logos não fazem mais parte desse grupo.**
 5. **Fotos do Facebook**: a maioria exige login e o provider não usa cookies (decisão deliberada). Fotos públicas com
    `og:image` são suportadas; as demais recebem mensagem específica. Não há contorno de autenticação.
 6. **Buscas textuais de Pinterest/TikTok**: Pinterest usa a página pública móvel e exige sinal de relevância; TikTok
    usa `/discover/<termo>` e só cobre os termos que têm página de descoberta. A busca completa do TikTok e qualquer
    rota que exija assinatura/anti-bot continuam fora do escopo; não há fallback Vex nem resultado simulado.
-7. **Logos (38 comandos)**: a validação local da resposta e a cobertura do menu estão testadas, mas a geração real
-   não foi validada nesta rodada porque o ambiente não tem `apikey_vex`. A resposta real da Vex pode ser JSON com URL
-   ou imagem direta; o código só aceita imagem com assinatura válida (nunca envia JSON/HTML).
+7. **Logos (38 comandos)**: geração local validada por teste (PNG real, 38 configurações, duais, escape, cache).
+   Limitações: a fidelidade é aproximada, não replica pixel a pixel os efeitos/assets da Vex; as fontes vêm do sistema
+   e podem variar; não houve validação visual em conversa real no WhatsApp. O `sharp` está instalado em `node_modules`
+   (entrada de peer no lockfile), mas não está declarado diretamente em `package.json` — declarar antes de publicar o projeto.

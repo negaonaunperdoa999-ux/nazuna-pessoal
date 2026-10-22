@@ -23472,9 +23472,8 @@ ${prefix}togglecmdvip premium_ia off`);
         break;
       case 'pornhub':
       case 'avengers':
-      case 'deadpool':
-      case 'avengers':
       case 'marvel':
+      case 'deadpool':
 
         try {
           const [texto1, texto2] = q.split('/').map(i => i.trim());
